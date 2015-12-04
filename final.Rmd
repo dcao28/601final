@@ -1,0 +1,115 @@
+---
+title: "601final"
+author: "Dingxian Cao"
+date: "December 3, 2015"
+output: html_document
+---
+
+office:
+M:1:30pm
+F:11:00am
+
+```{r}
+setwd("~/601final")
+library(xlsx)
+set.b<-read.csv(file = "data/Set_b.csv",header = T)
+set.c<-read.csv(file = "data/Set_c.csv",header = T)
+yy<- read.xlsx("data/TP53.xlsx",sheetIndex = 1)##TP53
+
+#View(set.b);View(set.c)
+#names(set.b)[names(set.b) %in% names(set.c)]
+
+suppressMessages(library(MASS))
+
+
+```
+
+##1.transformation  
+
+```{r}
+
+suppressMessages(library(bestglm))
+suppressMessages(library(dplyr))
+dd<-mutate(y=log(response),.data = set.b)#new y
+dd<- select(dd,-response)
+dd<-filter(dd,!(is.infinite(dd$y)))#new data  
+
+```  
+
+
+# 2. linear model selection(AIC,BIC,CP,CV)
+```{r}
+aic<-bestglm(Xy = dd,
+             family = gaussian,
+             IC = "AIC", 
+             method = "forward") 
+names(aic$BestModel$model) 
+summary(aic)
+
+bic<-bestglm(Xy = dd,
+             family = gaussian,
+             IC = "BIC", 
+             method = "forward") 
+bic$BestModel
+
+pairs(bic$BestModel$model)
+
+
+```  
+
+## PCR  
+
+```{r}
+suppressMessages(library(pls))
+pca<-pcr(y ~ ., ncomp = 10,scale = TRUE,
+    data = dd, validation = "CV")
+summary(pca)
+pca.lm<-lm(y~pca$scores,dd)
+summary(pca.lm)
+```  
+
+## PLS  
+
+```{r}
+pls<-plsr(y ~ .,ncomp = 10,scale = TRUE,
+          data = dd, validation = "CV"
+          ,method="oscorespls")
+
+summary(pls)
+drop(coef(pls))
+
+pls.lm<-lm(y~pls$scores,dd)
+summary(pls.lm)
+``` 
+
+## Ridge  
+
+
+## 3.GLM
+
+```{r}
+
+```
+
+
+
+## 4.GMC  
+
+find the optimal subset of X which make the $GMC(Y|X_{sub})$ or $GMC(Y|G(X_{sub}))$ largest!
+
+subset: from the previous results  
+link function(G())
+
+
+```{r}
+source("GMC.R")
+GMC
+```
+
+
+
+
+
+
+
+
