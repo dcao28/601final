@@ -92,8 +92,6 @@ $$Maximize~~GMC(Y|g(X))-lambda (lasso)$$
 
 $$g(x)=x\\ linear~~ model$$ 
 
-take variable and initial beta from AIC model: b_aic_stepwise    
-
 ```{r,eval=TRUE}
 g1<-function(x){
   return(x)
@@ -130,40 +128,34 @@ findopt<-function(lambda){
   return(c(lambda,opt$par,-opt$value))
 }
 
-OptEveryLambda1<-mclapply(lambda.set, FUN = findopt,mc.cores=4)
-class(OptEveryLambda1)
-save(OptEveryLambda1, file = "Rdata/OptEveryLambda1.RData")
-#colnames(OpetEveryLambda)[c(1,2,)]<- c("lambda1","lambda2","GMC(Y|G(X))")
+OptEveryLambda1_b<-mclapply(lambda.set, FUN = findopt,mc.cores=4)
+class(OptEveryLambda1_b)
+save(OptEveryLambda1_b, file = "Rdata/OptEveryLambda1_b.RData")
+#colnames(OpetEveryLambda)[c(1,2,)]<- c("lambda1","lambda2","GMC(Y|G(X))+lasso")
 
-fn<-function(beta){
-  xb= as.matrix(bestmodel$model[-1]) %*% beta[-1]+beta[1]
-  data<-cbind(g1(xb),bestmodel$model$y)#X,Y
-  return(-GMC(data)[2]+ lambda*sum(beta))#(GMC(X|Y),GMC(Y|X))
-  
-}
-opt<-optim(par = initials, fn =fn, method = "Nelder-Mead" )
-opt$par
--opt$value#optimal GMC(Y|X)
+optgmc<-sapply(OptEveryLambda1_b, function(x) return(x[c(length(x))]))
+(optgmc<- OptEveryLambda1_b[[which.max(optgmc)]])
+
+xb<- as.matrix(bestmodel$model[-1]) %*% optgmc[c(-1,-2,-3,-length(optgmc))] + optgmc[3]
+fit.n<-g1(xb)
+data<-cbind(fit.n, bestmodel$model$y)#X,Y
+(gmc <- GMC(data)[2])
 ```  
 
 
 $$g(x)= e^x Poisson~~ regression$$  
 
-use variable from bic model 
-
-```{r,eval=FALSE}
+```{r,eval=TRUE}
 g2<-function(x){
   return(exp(x))
 }
-poisson<- glm(y ~ ., family="poisson", data=bestmodel$model)
-initials<- poisson$coefficients
 
-data<-cbind(poisson$fitted.values,bestmodel$model$y)#X,Y
+data<-cbind(g2(bestmodel$fitted.values),bestmodel$model$y)#X,Y
 GMC(data)#(GMC(X|Y),GMC(Y|X)) 
 ```
 
 
-```{r,eval=FALSE}
+```{r,eval=TRUE}
 #require(parallel)
 #optimal beta
 
@@ -181,18 +173,144 @@ findopt<-function(lambda){
   return(c(lambda,opt$par,-opt$value))
 }
 
-OptEveryLambda2<-mclapply(lambda.set, FUN = findopt,mc.cores=4)
-class(OptEveryLambda2)
-save(OptEveryLambda2, file = "OptEveryLambda2.RData")
-# fn<-function(beta){
-#   xb= as.matrix(bestmodel$model[-1]) %*% beta[-1]+beta[1]
-#   
-#   data<-cbind(g2(xb),bestmodel$model$y)#X,Y
-#   return(-GMC(data)[2]+ lambda*sum(beta))#(GMC(X|Y),GMC(Y|X))
-# }
-# opt<-optim(par = initials, fn =fn, method = "Nelder-Mead" )
-# opt$par
-# -opt$value#optimal GMC
+OptEveryLambda2_b<-mclapply(lambda.set, FUN = findopt,mc.cores=4)
+class(OptEveryLambda2_b)
+save(OptEveryLambda2_b, file = "Rdata/OptEveryLambda2_b.RData")
+#colnames(OpetEveryLambda)[c(1,2,)]<- c("lambda1","lambda2","GMC(Y|G(X))+lasso")
+
+optgmc<-sapply(OptEveryLambda2_b, function(x) return(x[c(length(x))]))
+(optgmc<- OptEveryLambda2_b[[which.max(optgmc)]])
+
+xb<- as.matrix(bestmodel$model[-1]) %*% optgmc[c(-1,-2,-3,-length(optgmc))] + optgmc[3]
+fit.n<-g1(xb)
+data<-cbind(fit.n, bestmodel$model$y)#X,Y
+(gmc <- GMC(data)[2])
+```  
+
+$$sin(x)$$  
+
+```{r}
+g3<-function(x){
+  return(sin(x))
+}
+
+
+data<-cbind(g3(bestmodel$fitted.values),bestmodel$model$y)#X,Y
+GMC(data)#(GMC(X|Y),GMC(Y|X)) 
+#require(parallel)
+#optimal beta
+
+findopt<-function(lambda){
+  lambda1<-lambda[1];lambda2<-lambda[2]
+  fn<-function(beta){
+  xb= as.matrix(bestmodel$model[-1]) %*% beta[-1]+beta[1]
+  fit.n<-g3(xb)
+  resid<-bestmodel$model$y- fit.n
+  data<-cbind(fit.n,bestmodel$model$y)#X,Y
+  return(-GMC(data)[2]+ lambda1*var(fit.n,resid)+lambda2*sum(abs(beta)))
+ }
+  
+  opt<-optim(par = initials, fn =fn, method = "Nelder-Mead" )
+  return(c(lambda,opt$par,-opt$value))
+}
+
+OptEveryLambda3_b<-mclapply(lambda.set, FUN = findopt,mc.cores=4)
+class(OptEveryLambda3_b)
+save(OptEveryLambda3_b, file = "Rdata/OptEveryLambda3_b.RData")
+#colnames(OpetEveryLambda)[c(1,2,)]<- c("lambda1","lambda2","GMC(Y|G(X))+lasso")
+
+optgmc<-sapply(OptEveryLambda3_b, function(x) return(x[c(length(x))]))
+(optgmc<- OptEveryLambda3_b[[which.max(optgmc)]])
+
+xb<- as.matrix(bestmodel$model[-1]) %*% optgmc[c(-1,-2,-3,-length(optgmc))] + optgmc[3]
+fit.n<-g1(xb)
+data<-cbind(fit.n, bestmodel$model$y)#X,Y
+(gmc <- GMC(data)[2])
+
+```
+
+$$g(x)= x^2$$
+
+```{r}
+g4<-function(x){
+  return(x^2)
+}
+
+
+data<-cbind(g4(bestmodel$fitted.values),bestmodel$model$y)#X,Y
+GMC(data)#(GMC(X|Y),GMC(Y|X)) 
+#require(parallel)
+#optimal beta
+
+findopt<-function(lambda){
+  lambda1<-lambda[1];lambda2<-lambda[2]
+  fn<-function(beta){
+  xb= as.matrix(bestmodel$model[-1]) %*% beta[-1]+beta[1]
+  fit.n<-g4(xb)
+  resid<-bestmodel$model$y- fit.n
+  data<-cbind(fit.n,bestmodel$model$y)#X,Y
+  return(-GMC(data)[2]+ lambda1*var(fit.n,resid)+lambda2*sum(abs(beta)))
+ }
+  
+  opt<-optim(par = initials, fn =fn, method = "Nelder-Mead" )
+  return(c(lambda,opt$par,-opt$value))
+}
+
+OptEveryLambda4_b<-mclapply(lambda.set, FUN = findopt,mc.cores=4)
+class(OptEveryLambda4_b)
+save(OptEveryLambda4_b, file = "Rdata/OptEveryLambda4_b.RData")
+#colnames(OpetEveryLambda)[c(1,2,)]<- c("lambda1","lambda2","GMC(Y|G(X))+lasso")
+
+optgmc<-sapply(OptEveryLambda4_b, function(x) return(x[c(length(x))]))
+(optgmc<- OptEveryLambda4_b[[which.max(optgmc)]])
+
+xb<- as.matrix(bestmodel$model[-1]) %*% optgmc[c(-1,-2,-3,-length(optgmc))] + optgmc[3]
+fit.n<-g1(xb)
+data<-cbind(fit.n, bestmodel$model$y)#X,Y
+(gmc <- GMC(data)[2])
+
+```  
+
+
+$$g(x)=x^3$$
+
+```{r}
+g5<-function(x){
+  return(x^3)
+}
+
+
+data<-cbind(g4(bestmodel$fitted.values),bestmodel$model$y)#X,Y
+GMC(data)#(GMC(X|Y),GMC(Y|X)) 
+#require(parallel)
+#optimal beta
+
+findopt<-function(lambda){
+  lambda1<-lambda[1];lambda2<-lambda[2]
+  fn<-function(beta){
+  xb= as.matrix(bestmodel$model[-1]) %*% beta[-1]+beta[1]
+  fit.n<-g5(xb)
+  resid<-bestmodel$model$y- fit.n
+  data<-cbind(fit.n,bestmodel$model$y)#X,Y
+  return(-GMC(data)[2]+ lambda1*var(fit.n,resid)+lambda2*sum(abs(beta)))
+ }
+  
+  opt<-optim(par = initials, fn =fn, method = "Nelder-Mead" )
+  return(c(lambda,opt$par,-opt$value))
+}
+
+OptEveryLambda5_b<-mclapply(lambda.set, FUN = findopt,mc.cores=4)
+class(OptEveryLambda5_b)
+save(OptEveryLambda5_b, file = "Rdata/OptEveryLambda5_b.RData")
+#colnames(OpetEveryLambda)[c(1,2,)]<- c("lambda1","lambda2","GMC(Y|G(X))+lasso")
+
+optgmc<-sapply(OptEveryLambda5_b, function(x) return(x[c(length(x))]))
+(optgmc<- OptEveryLambda5_b[[which.max(optgmc)]])
+
+xb<- as.matrix(bestmodel$model[-1]) %*% optgmc[c(-1,-2,-3,-length(optgmc))] + optgmc[3]
+fit.n<-g1(xb)
+data<-cbind(fit.n, bestmodel$model$y)#X,Y
+(gmc <- GMC(data)[2])
 ```
 
 
@@ -242,13 +360,11 @@ $$Maximize~~GMC(Y|g(X))-lambda (lasso)$$
 
 $$g(x)=x\\ linear~~ model$$ 
 
-take variable and initial beta from AIC model: b_aic_stepwise    
-
 ```{r,eval=TRUE}
 g1<-function(x){
   return(x)
 }
-source("GMC.R")
+source("Script/GMC.R")
 xb<- bestmodel$fitted.values
 data<-cbind(g1(xb),bestmodel$model$y)#X,Y
 GMC(data)#(GMC(X|Y),GMC(Y|X))
@@ -260,7 +376,7 @@ GMC(data)#(GMC(X|Y),GMC(Y|X))
 (initials<-bestmodel$coefficients)#initial beta  
 require(parallel)
 #optimal beta
-rnge<- seq(0,2,by = 0.5)
+rnge<- seq(0,2,by = 0.5)#lambda range
 lambda1<- as.vector(sapply(rnge, function(x) rep(x,length(rnge))))
 lambda2<- rnge
 lambda.set <- rbind(lambda1, lambda2)
@@ -280,40 +396,34 @@ findopt<-function(lambda){
   return(c(lambda,opt$par,-opt$value))
 }
 
-OptEveryLambda<-mclapply(lambda.set, FUN = findopt,mc.cores=4)
-class(OptEveryLambda)
-save(OptEveryLambda, file = "OptEveryLambda.RData")
-#colnames(OpetEveryLambda)[c(1,2,)]<- c("lambda1","lambda2","GMC(Y|G(X))")
+OptEveryLambda1_c<-mclapply(lambda.set, FUN = findopt,mc.cores=4)
+class(OptEveryLambda1_c)
+save(OptEveryLambda1_c, file = "Rdata/OptEveryLambda1_c.RData")
+#colnames(OpetEveryLambda)[c(1,2,)]<- c("lambda1","lambda2","GMC(Y|G(X))+lasso")
 
-fn<-function(beta){
-  xb= as.matrix(bestmodel$model[-1]) %*% beta[-1]+beta[1]
-  data<-cbind(g1(xb),bestmodel$model$y)#X,Y
-  return(-GMC(data)[2]+ lambda*sum(beta))#(GMC(X|Y),GMC(Y|X))
-  
-}
-opt<-optim(par = initials, fn =fn, method = "Nelder-Mead" )
-opt$par
--opt$value#optimal GMC(Y|X)
+optgmc<-sapply(OptEveryLambda1_c, function(x) return(x[c(length(x))]))
+(optgmc<- OptEveryLambda1_c[[which.max(optgmc)]])
+
+xb<- as.matrix(bestmodel$model[-1]) %*% optgmc[c(-1,-2,-3,-length(optgmc))] + optgmc[3]
+fit.n<-g1(xb)
+data<-cbind(fit.n, bestmodel$model$y)#X,Y
+(gmc <- GMC(data)[2])
 ```  
 
 
 $$g(x)= e^x Poisson~~ regression$$  
 
-use variable from bic model 
-
-```{r,eval=FALSE}
+```{r,eval=TRUE}
 g2<-function(x){
   return(exp(x))
 }
-poisson<- glm(y ~ ., family="poisson", data=bestmodel$model)
-initials<- poisson$coefficients
 
-data<-cbind(poisson$fitted.values,bestmodel$model$y)#X,Y
+data<-cbind(g2(bestmodel$fitted.values),bestmodel$model$y)#X,Y
 GMC(data)#(GMC(X|Y),GMC(Y|X)) 
 ```
 
 
-```{r,eval=FALSE}
+```{r,eval=TRUE}
 #require(parallel)
 #optimal beta
 
@@ -331,18 +441,144 @@ findopt<-function(lambda){
   return(c(lambda,opt$par,-opt$value))
 }
 
-OptEveryLambda2<-mclapply(lambda.set, FUN = findopt,mc.cores=4)
-class(OptEveryLambda2)
-save(OptEveryLambda2, file = "OptEveryLambda2.RData")
-# fn<-function(beta){
-#   xb= as.matrix(bestmodel$model[-1]) %*% beta[-1]+beta[1]
-#   
-#   data<-cbind(g2(xb),bestmodel$model$y)#X,Y
-#   return(-GMC(data)[2]+ lambda*sum(beta))#(GMC(X|Y),GMC(Y|X))
-# }
-# opt<-optim(par = initials, fn =fn, method = "Nelder-Mead" )
-# opt$par
-# -opt$value#optimal GMC
+OptEveryLambda2_c<-mclapply(lambda.set, FUN = findopt,mc.cores=4)
+class(OptEveryLambda2_c)
+save(OptEveryLambda2_c, file = "Rdata/OptEveryLambda2_c.RData")
+#colnames(OpetEveryLambda)[c(1,2,)]<- c("lambda1","lambda2","GMC(Y|G(X))+lasso")
+
+optgmc<-sapply(OptEveryLambda2_c, function(x) return(x[c(length(x))]))
+(optgmc<- OptEveryLambda2_c[[which.max(optgmc)]])
+
+xb<- as.matrix(bestmodel$model[-1]) %*% optgmc[c(-1,-2,-3,-length(optgmc))] + optgmc[3]
+fit.n<-g1(xb)
+data<-cbind(fit.n, bestmodel$model$y)#X,Y
+(gmc <- GMC(data)[2])
+```  
+
+$$sin(x)$$  
+
+```{r}
+g3<-function(x){
+  return(sin(x))
+}
+
+
+data<-cbind(g3(bestmodel$fitted.values),bestmodel$model$y)#X,Y
+GMC(data)#(GMC(X|Y),GMC(Y|X)) 
+#require(parallel)
+#optimal beta
+
+findopt<-function(lambda){
+  lambda1<-lambda[1];lambda2<-lambda[2]
+  fn<-function(beta){
+  xb= as.matrix(bestmodel$model[-1]) %*% beta[-1]+beta[1]
+  fit.n<-g3(xb)
+  resid<-bestmodel$model$y- fit.n
+  data<-cbind(fit.n,bestmodel$model$y)#X,Y
+  return(-GMC(data)[2]+ lambda1*var(fit.n,resid)+lambda2*sum(abs(beta)))
+ }
+  
+  opt<-optim(par = initials, fn =fn, method = "Nelder-Mead" )
+  return(c(lambda,opt$par,-opt$value))
+}
+
+OptEveryLambda3_c<-mclapply(lambda.set, FUN = findopt,mc.cores=4)
+class(OptEveryLambda3_c)
+save(OptEveryLambda3_c, file = "Rdata/OptEveryLambda3_c.RData")
+#colnames(OpetEveryLambda)[c(1,2,)]<- c("lambda1","lambda2","GMC(Y|G(X))+lasso")
+
+optgmc<-sapply(OptEveryLambda3_c, function(x) return(x[c(length(x))]))
+(optgmc<- OptEveryLambda3_c[[which.max(optgmc)]])
+
+xb<- as.matrix(bestmodel$model[-1]) %*% optgmc[c(-1,-2,-3,-length(optgmc))] + optgmc[3]
+fit.n<-g1(xb)
+data<-cbind(fit.n, bestmodel$model$y)#X,Y
+(gmc <- GMC(data)[2])
+
+```
+
+$$g(x)= x^2$$
+
+```{r}
+g4<-function(x){
+  return(x^2)
+}
+
+
+data<-cbind(g4(bestmodel$fitted.values),bestmodel$model$y)#X,Y
+GMC(data)#(GMC(X|Y),GMC(Y|X)) 
+#require(parallel)
+#optimal beta
+
+findopt<-function(lambda){
+  lambda1<-lambda[1];lambda2<-lambda[2]
+  fn<-function(beta){
+  xb= as.matrix(bestmodel$model[-1]) %*% beta[-1]+beta[1]
+  fit.n<-g4(xb)
+  resid<-bestmodel$model$y- fit.n
+  data<-cbind(fit.n,bestmodel$model$y)#X,Y
+  return(-GMC(data)[2]+ lambda1*var(fit.n,resid)+lambda2*sum(abs(beta)))
+ }
+  
+  opt<-optim(par = initials, fn =fn, method = "Nelder-Mead" )
+  return(c(lambda,opt$par,-opt$value))
+}
+
+OptEveryLambda4_c<-mclapply(lambda.set, FUN = findopt,mc.cores=4)
+class(OptEveryLambda4_c)
+save(OptEveryLambda4_c, file = "Rdata/OptEveryLambda4_c.RData")
+#colnames(OpetEveryLambda)[c(1,2,)]<- c("lambda1","lambda2","GMC(Y|G(X))+lasso")
+
+optgmc<-sapply(OptEveryLambda4_c, function(x) return(x[c(length(x))]))
+(optgmc<- OptEveryLambda4_c[[which.max(optgmc)]])
+
+xb<- as.matrix(bestmodel$model[-1]) %*% optgmc[c(-1,-2,-3,-length(optgmc))] + optgmc[3]
+fit.n<-g1(xb)
+data<-cbind(fit.n, bestmodel$model$y)#X,Y
+(gmc <- GMC(data)[2])
+
+```  
+
+
+$$g(x)=x^3$$
+
+```{r}
+g5<-function(x){
+  return(x^3)
+}
+
+
+data<-cbind(g4(bestmodel$fitted.values),bestmodel$model$y)#X,Y
+GMC(data)#(GMC(X|Y),GMC(Y|X)) 
+#require(parallel)
+#optimal beta
+
+findopt<-function(lambda){
+  lambda1<-lambda[1];lambda2<-lambda[2]
+  fn<-function(beta){
+  xb= as.matrix(bestmodel$model[-1]) %*% beta[-1]+beta[1]
+  fit.n<-g5(xb)
+  resid<-bestmodel$model$y- fit.n
+  data<-cbind(fit.n,bestmodel$model$y)#X,Y
+  return(-GMC(data)[2]+ lambda1*var(fit.n,resid)+lambda2*sum(abs(beta)))
+ }
+  
+  opt<-optim(par = initials, fn =fn, method = "Nelder-Mead" )
+  return(c(lambda,opt$par,-opt$value))
+}
+
+OptEveryLambda5_c<-mclapply(lambda.set, FUN = findopt,mc.cores=4)
+class(OptEveryLambda5_c)
+save(OptEveryLambda5_c, file = "Rdata/OptEveryLambda5_c.RData")
+#colnames(OpetEveryLambda)[c(1,2,)]<- c("lambda1","lambda2","GMC(Y|G(X))+lasso")
+
+optgmc<-sapply(OptEveryLambda5_c, function(x) return(x[c(length(x))]))
+(optgmc<- OptEveryLambda5_c[[which.max(optgmc)]])
+
+xb<- as.matrix(bestmodel$model[-1]) %*% optgmc[c(-1,-2,-3,-length(optgmc))] + optgmc[3]
+fit.n<-g1(xb)
+data<-cbind(fit.n, bestmodel$model$y)#X,Y
+(gmc <- GMC(data)[2])
 ```
 
 # 3.Set b, TP53   
@@ -391,13 +627,11 @@ $$Maximize~~GMC(Y|g(X))-lambda (lasso)$$
 
 $$g(x)=x\\ linear~~ model$$ 
 
-take variable and initial beta from AIC model: b_aic_stepwise    
-
 ```{r,eval=TRUE}
 g1<-function(x){
   return(x)
 }
-source("GMC.R")
+source("Script/GMC.R")
 xb<- bestmodel$fitted.values
 data<-cbind(g1(xb),bestmodel$model$y)#X,Y
 GMC(data)#(GMC(X|Y),GMC(Y|X))
@@ -409,7 +643,7 @@ GMC(data)#(GMC(X|Y),GMC(Y|X))
 (initials<-bestmodel$coefficients)#initial beta  
 require(parallel)
 #optimal beta
-rnge<- seq(0,2,by = 0.5)
+rnge<- seq(0,2,by = 0.5)#lambda range
 lambda1<- as.vector(sapply(rnge, function(x) rep(x,length(rnge))))
 lambda2<- rnge
 lambda.set <- rbind(lambda1, lambda2)
@@ -429,40 +663,34 @@ findopt<-function(lambda){
   return(c(lambda,opt$par,-opt$value))
 }
 
-OptEveryLambda<-mclapply(lambda.set, FUN = findopt,mc.cores=4)
-class(OptEveryLambda)
-save(OptEveryLambda, file = "OptEveryLambda.RData")
-#colnames(OpetEveryLambda)[c(1,2,)]<- c("lambda1","lambda2","GMC(Y|G(X))")
+OptEveryLambda1_b<-mclapply(lambda.set, FUN = findopt,mc.cores=4)
+class(OptEveryLambda1_b)
+save(OptEveryLambda1_b, file = "Rdata/OptEveryLambda1_b.RData")
+#colnames(OpetEveryLambda)[c(1,2,)]<- c("lambda1","lambda2","GMC(Y|G(X))+lasso")
 
-fn<-function(beta){
-  xb= as.matrix(bestmodel$model[-1]) %*% beta[-1]+beta[1]
-  data<-cbind(g1(xb),bestmodel$model$y)#X,Y
-  return(-GMC(data)[2]+ lambda*sum(beta))#(GMC(X|Y),GMC(Y|X))
-  
-}
-opt<-optim(par = initials, fn =fn, method = "Nelder-Mead" )
-opt$par
--opt$value#optimal GMC(Y|X)
+optgmc<-sapply(OptEveryLambda1_b, function(x) return(x[c(length(x))]))
+(optgmc<- OptEveryLambda1_b[[which.max(optgmc)]])
+
+xb<- as.matrix(bestmodel$model[-1]) %*% optgmc[c(-1,-2,-3,-length(optgmc))] + optgmc[3]
+fit.n<-g1(xb)
+data<-cbind(fit.n, bestmodel$model$y)#X,Y
+(gmc <- GMC(data)[2])
 ```  
 
 
 $$g(x)= e^x Poisson~~ regression$$  
 
-use variable from bic model 
-
-```{r,eval=FALSE}
+```{r,eval=TRUE}
 g2<-function(x){
   return(exp(x))
 }
-poisson<- glm(y ~ ., family="poisson", data=bestmodel$model)
-initials<- poisson$coefficients
 
-data<-cbind(poisson$fitted.values,bestmodel$model$y)#X,Y
+data<-cbind(g2(bestmodel$fitted.values),bestmodel$model$y)#X,Y
 GMC(data)#(GMC(X|Y),GMC(Y|X)) 
 ```
 
 
-```{r,eval=FALSE}
+```{r,eval=TRUE}
 #require(parallel)
 #optimal beta
 
@@ -480,18 +708,144 @@ findopt<-function(lambda){
   return(c(lambda,opt$par,-opt$value))
 }
 
-OptEveryLambda2<-mclapply(lambda.set, FUN = findopt,mc.cores=4)
-class(OptEveryLambda2)
-save(OptEveryLambda2, file = "OptEveryLambda2.RData")
-# fn<-function(beta){
-#   xb= as.matrix(bestmodel$model[-1]) %*% beta[-1]+beta[1]
-#   
-#   data<-cbind(g2(xb),bestmodel$model$y)#X,Y
-#   return(-GMC(data)[2]+ lambda*sum(beta))#(GMC(X|Y),GMC(Y|X))
-# }
-# opt<-optim(par = initials, fn =fn, method = "Nelder-Mead" )
-# opt$par
-# -opt$value#optimal GMC
+OptEveryLambda2_b<-mclapply(lambda.set, FUN = findopt,mc.cores=4)
+class(OptEveryLambda2_b)
+save(OptEveryLambda2_b, file = "Rdata/OptEveryLambda2_b.RData")
+#colnames(OpetEveryLambda)[c(1,2,)]<- c("lambda1","lambda2","GMC(Y|G(X))+lasso")
+
+optgmc<-sapply(OptEveryLambda2_b, function(x) return(x[c(length(x))]))
+(optgmc<- OptEveryLambda2_b[[which.max(optgmc)]])
+
+xb<- as.matrix(bestmodel$model[-1]) %*% optgmc[c(-1,-2,-3,-length(optgmc))] + optgmc[3]
+fit.n<-g1(xb)
+data<-cbind(fit.n, bestmodel$model$y)#X,Y
+(gmc <- GMC(data)[2])
+```  
+
+$$sin(x)$$  
+
+```{r}
+g3<-function(x){
+  return(sin(x))
+}
+
+
+data<-cbind(g3(bestmodel$fitted.values),bestmodel$model$y)#X,Y
+GMC(data)#(GMC(X|Y),GMC(Y|X)) 
+#require(parallel)
+#optimal beta
+
+findopt<-function(lambda){
+  lambda1<-lambda[1];lambda2<-lambda[2]
+  fn<-function(beta){
+  xb= as.matrix(bestmodel$model[-1]) %*% beta[-1]+beta[1]
+  fit.n<-g3(xb)
+  resid<-bestmodel$model$y- fit.n
+  data<-cbind(fit.n,bestmodel$model$y)#X,Y
+  return(-GMC(data)[2]+ lambda1*var(fit.n,resid)+lambda2*sum(abs(beta)))
+ }
+  
+  opt<-optim(par = initials, fn =fn, method = "Nelder-Mead" )
+  return(c(lambda,opt$par,-opt$value))
+}
+
+OptEveryLambda3_b<-mclapply(lambda.set, FUN = findopt,mc.cores=4)
+class(OptEveryLambda3_b)
+save(OptEveryLambda3_b, file = "Rdata/OptEveryLambda3_b.RData")
+#colnames(OpetEveryLambda)[c(1,2,)]<- c("lambda1","lambda2","GMC(Y|G(X))+lasso")
+
+optgmc<-sapply(OptEveryLambda3_b, function(x) return(x[c(length(x))]))
+(optgmc<- OptEveryLambda3_b[[which.max(optgmc)]])
+
+xb<- as.matrix(bestmodel$model[-1]) %*% optgmc[c(-1,-2,-3,-length(optgmc))] + optgmc[3]
+fit.n<-g1(xb)
+data<-cbind(fit.n, bestmodel$model$y)#X,Y
+(gmc <- GMC(data)[2])
+
+```
+
+$$g(x)= x^2$$
+
+```{r}
+g4<-function(x){
+  return(x^2)
+}
+
+
+data<-cbind(g4(bestmodel$fitted.values),bestmodel$model$y)#X,Y
+GMC(data)#(GMC(X|Y),GMC(Y|X)) 
+#require(parallel)
+#optimal beta
+
+findopt<-function(lambda){
+  lambda1<-lambda[1];lambda2<-lambda[2]
+  fn<-function(beta){
+  xb= as.matrix(bestmodel$model[-1]) %*% beta[-1]+beta[1]
+  fit.n<-g4(xb)
+  resid<-bestmodel$model$y- fit.n
+  data<-cbind(fit.n,bestmodel$model$y)#X,Y
+  return(-GMC(data)[2]+ lambda1*var(fit.n,resid)+lambda2*sum(abs(beta)))
+ }
+  
+  opt<-optim(par = initials, fn =fn, method = "Nelder-Mead" )
+  return(c(lambda,opt$par,-opt$value))
+}
+
+OptEveryLambda4_b<-mclapply(lambda.set, FUN = findopt,mc.cores=4)
+class(OptEveryLambda4_b)
+save(OptEveryLambda4_b, file = "Rdata/OptEveryLambda4_b.RData")
+#colnames(OpetEveryLambda)[c(1,2,)]<- c("lambda1","lambda2","GMC(Y|G(X))+lasso")
+
+optgmc<-sapply(OptEveryLambda4_b, function(x) return(x[c(length(x))]))
+(optgmc<- OptEveryLambda4_b[[which.max(optgmc)]])
+
+xb<- as.matrix(bestmodel$model[-1]) %*% optgmc[c(-1,-2,-3,-length(optgmc))] + optgmc[3]
+fit.n<-g1(xb)
+data<-cbind(fit.n, bestmodel$model$y)#X,Y
+(gmc <- GMC(data)[2])
+
+```  
+
+
+$$g(x)=x^3$$
+
+```{r}
+g5<-function(x){
+  return(x^3)
+}
+
+
+data<-cbind(g4(bestmodel$fitted.values),bestmodel$model$y)#X,Y
+GMC(data)#(GMC(X|Y),GMC(Y|X)) 
+#require(parallel)
+#optimal beta
+
+findopt<-function(lambda){
+  lambda1<-lambda[1];lambda2<-lambda[2]
+  fn<-function(beta){
+  xb= as.matrix(bestmodel$model[-1]) %*% beta[-1]+beta[1]
+  fit.n<-g5(xb)
+  resid<-bestmodel$model$y- fit.n
+  data<-cbind(fit.n,bestmodel$model$y)#X,Y
+  return(-GMC(data)[2]+ lambda1*var(fit.n,resid)+lambda2*sum(abs(beta)))
+ }
+  
+  opt<-optim(par = initials, fn =fn, method = "Nelder-Mead" )
+  return(c(lambda,opt$par,-opt$value))
+}
+
+OptEveryLambda5_b<-mclapply(lambda.set, FUN = findopt,mc.cores=4)
+class(OptEveryLambda5_b)
+save(OptEveryLambda5_b, file = "Rdata/OptEveryLambda5_b.RData")
+#colnames(OpetEveryLambda)[c(1,2,)]<- c("lambda1","lambda2","GMC(Y|G(X))+lasso")
+
+optgmc<-sapply(OptEveryLambda5_b, function(x) return(x[c(length(x))]))
+(optgmc<- OptEveryLambda5_b[[which.max(optgmc)]])
+
+xb<- as.matrix(bestmodel$model[-1]) %*% optgmc[c(-1,-2,-3,-length(optgmc))] + optgmc[3]
+fit.n<-g1(xb)
+data<-cbind(fit.n, bestmodel$model$y)#X,Y
+(gmc <- GMC(data)[2])
 ```
 
 # 4.Set C, TP53 
@@ -539,13 +893,11 @@ $$Maximize~~GMC(Y|g(X))-lambda (lasso)$$
 
 $$g(x)=x\\ linear~~ model$$ 
 
-take variable and initial beta from AIC model: b_aic_stepwise    
-
 ```{r,eval=TRUE}
 g1<-function(x){
   return(x)
 }
-source("GMC.R")
+source("Script/GMC.R")
 xb<- bestmodel$fitted.values
 data<-cbind(g1(xb),bestmodel$model$y)#X,Y
 GMC(data)#(GMC(X|Y),GMC(Y|X))
@@ -557,7 +909,7 @@ GMC(data)#(GMC(X|Y),GMC(Y|X))
 (initials<-bestmodel$coefficients)#initial beta  
 require(parallel)
 #optimal beta
-rnge<- seq(0,2,by = 0.5)
+rnge<- seq(0,2,by = 0.5)#lambda range
 lambda1<- as.vector(sapply(rnge, function(x) rep(x,length(rnge))))
 lambda2<- rnge
 lambda.set <- rbind(lambda1, lambda2)
@@ -577,40 +929,34 @@ findopt<-function(lambda){
   return(c(lambda,opt$par,-opt$value))
 }
 
-OptEveryLambda<-mclapply(lambda.set, FUN = findopt,mc.cores=4)
-class(OptEveryLambda)
-save(OptEveryLambda, file = "OptEveryLambda.RData")
-#colnames(OpetEveryLambda)[c(1,2,)]<- c("lambda1","lambda2","GMC(Y|G(X))")
+OptEveryLambda1_b<-mclapply(lambda.set, FUN = findopt,mc.cores=4)
+class(OptEveryLambda1_b)
+save(OptEveryLambda1_b, file = "Rdata/OptEveryLambda1_b.RData")
+#colnames(OpetEveryLambda)[c(1,2,)]<- c("lambda1","lambda2","GMC(Y|G(X))+lasso")
 
-fn<-function(beta){
-  xb= as.matrix(bestmodel$model[-1]) %*% beta[-1]+beta[1]
-  data<-cbind(g1(xb),bestmodel$model$y)#X,Y
-  return(-GMC(data)[2]+ lambda*sum(beta))#(GMC(X|Y),GMC(Y|X))
-  
-}
-opt<-optim(par = initials, fn =fn, method = "Nelder-Mead" )
-opt$par
--opt$value#optimal GMC(Y|X)
+optgmc<-sapply(OptEveryLambda1_b, function(x) return(x[c(length(x))]))
+(optgmc<- OptEveryLambda1_b[[which.max(optgmc)]])
+
+xb<- as.matrix(bestmodel$model[-1]) %*% optgmc[c(-1,-2,-3,-length(optgmc))] + optgmc[3]
+fit.n<-g1(xb)
+data<-cbind(fit.n, bestmodel$model$y)#X,Y
+(gmc <- GMC(data)[2])
 ```  
 
 
 $$g(x)= e^x Poisson~~ regression$$  
 
-use variable from bic model 
-
-```{r,eval=FALSE}
+```{r,eval=TRUE}
 g2<-function(x){
   return(exp(x))
 }
-poisson<- glm(y ~ ., family="poisson", data=bestmodel$model)
-initials<- poisson$coefficients
 
-data<-cbind(poisson$fitted.values,bestmodel$model$y)#X,Y
+data<-cbind(g2(bestmodel$fitted.values),bestmodel$model$y)#X,Y
 GMC(data)#(GMC(X|Y),GMC(Y|X)) 
 ```
 
 
-```{r,eval=FALSE}
+```{r,eval=TRUE}
 #require(parallel)
 #optimal beta
 
@@ -628,18 +974,144 @@ findopt<-function(lambda){
   return(c(lambda,opt$par,-opt$value))
 }
 
-OptEveryLambda2<-mclapply(lambda.set, FUN = findopt,mc.cores=4)
-class(OptEveryLambda2)
-save(OptEveryLambda2, file = "OptEveryLambda2.RData")
-# fn<-function(beta){
-#   xb= as.matrix(bestmodel$model[-1]) %*% beta[-1]+beta[1]
-#   
-#   data<-cbind(g2(xb),bestmodel$model$y)#X,Y
-#   return(-GMC(data)[2]+ lambda*sum(beta))#(GMC(X|Y),GMC(Y|X))
-# }
-# opt<-optim(par = initials, fn =fn, method = "Nelder-Mead" )
-# opt$par
-# -opt$value#optimal GMC
+OptEveryLambda2_b<-mclapply(lambda.set, FUN = findopt,mc.cores=4)
+class(OptEveryLambda2_b)
+save(OptEveryLambda2_b, file = "Rdata/OptEveryLambda2_b.RData")
+#colnames(OpetEveryLambda)[c(1,2,)]<- c("lambda1","lambda2","GMC(Y|G(X))+lasso")
+
+optgmc<-sapply(OptEveryLambda2_b, function(x) return(x[c(length(x))]))
+(optgmc<- OptEveryLambda2_b[[which.max(optgmc)]])
+
+xb<- as.matrix(bestmodel$model[-1]) %*% optgmc[c(-1,-2,-3,-length(optgmc))] + optgmc[3]
+fit.n<-g1(xb)
+data<-cbind(fit.n, bestmodel$model$y)#X,Y
+(gmc <- GMC(data)[2])
+```  
+
+$$sin(x)$$  
+
+```{r}
+g3<-function(x){
+  return(sin(x))
+}
+
+
+data<-cbind(g3(bestmodel$fitted.values),bestmodel$model$y)#X,Y
+GMC(data)#(GMC(X|Y),GMC(Y|X)) 
+#require(parallel)
+#optimal beta
+
+findopt<-function(lambda){
+  lambda1<-lambda[1];lambda2<-lambda[2]
+  fn<-function(beta){
+  xb= as.matrix(bestmodel$model[-1]) %*% beta[-1]+beta[1]
+  fit.n<-g3(xb)
+  resid<-bestmodel$model$y- fit.n
+  data<-cbind(fit.n,bestmodel$model$y)#X,Y
+  return(-GMC(data)[2]+ lambda1*var(fit.n,resid)+lambda2*sum(abs(beta)))
+ }
+  
+  opt<-optim(par = initials, fn =fn, method = "Nelder-Mead" )
+  return(c(lambda,opt$par,-opt$value))
+}
+
+OptEveryLambda3_b<-mclapply(lambda.set, FUN = findopt,mc.cores=4)
+class(OptEveryLambda3_b)
+save(OptEveryLambda3_b, file = "Rdata/OptEveryLambda3_b.RData")
+#colnames(OpetEveryLambda)[c(1,2,)]<- c("lambda1","lambda2","GMC(Y|G(X))+lasso")
+
+optgmc<-sapply(OptEveryLambda3_b, function(x) return(x[c(length(x))]))
+(optgmc<- OptEveryLambda3_b[[which.max(optgmc)]])
+
+xb<- as.matrix(bestmodel$model[-1]) %*% optgmc[c(-1,-2,-3,-length(optgmc))] + optgmc[3]
+fit.n<-g1(xb)
+data<-cbind(fit.n, bestmodel$model$y)#X,Y
+(gmc <- GMC(data)[2])
+
+```
+
+$$g(x)= x^2$$
+
+```{r}
+g4<-function(x){
+  return(x^2)
+}
+
+
+data<-cbind(g4(bestmodel$fitted.values),bestmodel$model$y)#X,Y
+GMC(data)#(GMC(X|Y),GMC(Y|X)) 
+#require(parallel)
+#optimal beta
+
+findopt<-function(lambda){
+  lambda1<-lambda[1];lambda2<-lambda[2]
+  fn<-function(beta){
+  xb= as.matrix(bestmodel$model[-1]) %*% beta[-1]+beta[1]
+  fit.n<-g4(xb)
+  resid<-bestmodel$model$y- fit.n
+  data<-cbind(fit.n,bestmodel$model$y)#X,Y
+  return(-GMC(data)[2]+ lambda1*var(fit.n,resid)+lambda2*sum(abs(beta)))
+ }
+  
+  opt<-optim(par = initials, fn =fn, method = "Nelder-Mead" )
+  return(c(lambda,opt$par,-opt$value))
+}
+
+OptEveryLambda4_b<-mclapply(lambda.set, FUN = findopt,mc.cores=4)
+class(OptEveryLambda4_b)
+save(OptEveryLambda4_b, file = "Rdata/OptEveryLambda4_b.RData")
+#colnames(OpetEveryLambda)[c(1,2,)]<- c("lambda1","lambda2","GMC(Y|G(X))+lasso")
+
+optgmc<-sapply(OptEveryLambda4_b, function(x) return(x[c(length(x))]))
+(optgmc<- OptEveryLambda4_b[[which.max(optgmc)]])
+
+xb<- as.matrix(bestmodel$model[-1]) %*% optgmc[c(-1,-2,-3,-length(optgmc))] + optgmc[3]
+fit.n<-g1(xb)
+data<-cbind(fit.n, bestmodel$model$y)#X,Y
+(gmc <- GMC(data)[2])
+
+```  
+
+
+$$g(x)=x^3$$
+
+```{r}
+g5<-function(x){
+  return(x^3)
+}
+
+
+data<-cbind(g4(bestmodel$fitted.values),bestmodel$model$y)#X,Y
+GMC(data)#(GMC(X|Y),GMC(Y|X)) 
+#require(parallel)
+#optimal beta
+
+findopt<-function(lambda){
+  lambda1<-lambda[1];lambda2<-lambda[2]
+  fn<-function(beta){
+  xb= as.matrix(bestmodel$model[-1]) %*% beta[-1]+beta[1]
+  fit.n<-g5(xb)
+  resid<-bestmodel$model$y- fit.n
+  data<-cbind(fit.n,bestmodel$model$y)#X,Y
+  return(-GMC(data)[2]+ lambda1*var(fit.n,resid)+lambda2*sum(abs(beta)))
+ }
+  
+  opt<-optim(par = initials, fn =fn, method = "Nelder-Mead" )
+  return(c(lambda,opt$par,-opt$value))
+}
+
+OptEveryLambda5_b<-mclapply(lambda.set, FUN = findopt,mc.cores=4)
+class(OptEveryLambda5_b)
+save(OptEveryLambda5_b, file = "Rdata/OptEveryLambda5_b.RData")
+#colnames(OpetEveryLambda)[c(1,2,)]<- c("lambda1","lambda2","GMC(Y|G(X))+lasso")
+
+optgmc<-sapply(OptEveryLambda5_b, function(x) return(x[c(length(x))]))
+(optgmc<- OptEveryLambda5_b[[which.max(optgmc)]])
+
+xb<- as.matrix(bestmodel$model[-1]) %*% optgmc[c(-1,-2,-3,-length(optgmc))] + optgmc[3]
+fit.n<-g1(xb)
+data<-cbind(fit.n, bestmodel$model$y)#X,Y
+(gmc <- GMC(data)[2])
 ```
 
 # 5.Combine,response  
@@ -688,13 +1160,11 @@ $$Maximize~~GMC(Y|g(X))-lambda (lasso)$$
 
 $$g(x)=x\\ linear~~ model$$ 
 
-take variable and initial beta from AIC model: b_aic_stepwise    
-
 ```{r,eval=TRUE}
 g1<-function(x){
   return(x)
 }
-source("GMC.R")
+source("Script/GMC.R")
 xb<- bestmodel$fitted.values
 data<-cbind(g1(xb),bestmodel$model$y)#X,Y
 GMC(data)#(GMC(X|Y),GMC(Y|X))
@@ -706,7 +1176,7 @@ GMC(data)#(GMC(X|Y),GMC(Y|X))
 (initials<-bestmodel$coefficients)#initial beta  
 require(parallel)
 #optimal beta
-rnge<- seq(0,2,by = 0.5)
+rnge<- seq(0,2,by = 0.5)#lambda range
 lambda1<- as.vector(sapply(rnge, function(x) rep(x,length(rnge))))
 lambda2<- rnge
 lambda.set <- rbind(lambda1, lambda2)
@@ -726,40 +1196,34 @@ findopt<-function(lambda){
   return(c(lambda,opt$par,-opt$value))
 }
 
-OptEveryLambda<-mclapply(lambda.set, FUN = findopt,mc.cores=4)
-class(OptEveryLambda)
-save(OptEveryLambda, file = "OptEveryLambda.RData")
-#colnames(OpetEveryLambda)[c(1,2,)]<- c("lambda1","lambda2","GMC(Y|G(X))")
+OptEveryLambda1_b<-mclapply(lambda.set, FUN = findopt,mc.cores=4)
+class(OptEveryLambda1_b)
+save(OptEveryLambda1_b, file = "Rdata/OptEveryLambda1_b.RData")
+#colnames(OpetEveryLambda)[c(1,2,)]<- c("lambda1","lambda2","GMC(Y|G(X))+lasso")
 
-fn<-function(beta){
-  xb= as.matrix(bestmodel$model[-1]) %*% beta[-1]+beta[1]
-  data<-cbind(g1(xb),bestmodel$model$y)#X,Y
-  return(-GMC(data)[2]+ lambda*sum(beta))#(GMC(X|Y),GMC(Y|X))
-  
-}
-opt<-optim(par = initials, fn =fn, method = "Nelder-Mead" )
-opt$par
--opt$value#optimal GMC(Y|X)
+optgmc<-sapply(OptEveryLambda1_b, function(x) return(x[c(length(x))]))
+(optgmc<- OptEveryLambda1_b[[which.max(optgmc)]])
+
+xb<- as.matrix(bestmodel$model[-1]) %*% optgmc[c(-1,-2,-3,-length(optgmc))] + optgmc[3]
+fit.n<-g1(xb)
+data<-cbind(fit.n, bestmodel$model$y)#X,Y
+(gmc <- GMC(data)[2])
 ```  
 
 
 $$g(x)= e^x Poisson~~ regression$$  
 
-use variable from bic model 
-
-```{r,eval=FALSE}
+```{r,eval=TRUE}
 g2<-function(x){
   return(exp(x))
 }
-poisson<- glm(y ~ ., family="poisson", data=bestmodel$model)
-initials<- poisson$coefficients
 
-data<-cbind(poisson$fitted.values,bestmodel$model$y)#X,Y
+data<-cbind(g2(bestmodel$fitted.values),bestmodel$model$y)#X,Y
 GMC(data)#(GMC(X|Y),GMC(Y|X)) 
 ```
 
 
-```{r,eval=FALSE}
+```{r,eval=TRUE}
 #require(parallel)
 #optimal beta
 
@@ -777,18 +1241,144 @@ findopt<-function(lambda){
   return(c(lambda,opt$par,-opt$value))
 }
 
-OptEveryLambda2<-mclapply(lambda.set, FUN = findopt,mc.cores=4)
-class(OptEveryLambda2)
-save(OptEveryLambda2, file = "OptEveryLambda2.RData")
-# fn<-function(beta){
-#   xb= as.matrix(bestmodel$model[-1]) %*% beta[-1]+beta[1]
-#   
-#   data<-cbind(g2(xb),bestmodel$model$y)#X,Y
-#   return(-GMC(data)[2]+ lambda*sum(beta))#(GMC(X|Y),GMC(Y|X))
-# }
-# opt<-optim(par = initials, fn =fn, method = "Nelder-Mead" )
-# opt$par
-# -opt$value#optimal GMC
+OptEveryLambda2_b<-mclapply(lambda.set, FUN = findopt,mc.cores=4)
+class(OptEveryLambda2_b)
+save(OptEveryLambda2_b, file = "Rdata/OptEveryLambda2_b.RData")
+#colnames(OpetEveryLambda)[c(1,2,)]<- c("lambda1","lambda2","GMC(Y|G(X))+lasso")
+
+optgmc<-sapply(OptEveryLambda2_b, function(x) return(x[c(length(x))]))
+(optgmc<- OptEveryLambda2_b[[which.max(optgmc)]])
+
+xb<- as.matrix(bestmodel$model[-1]) %*% optgmc[c(-1,-2,-3,-length(optgmc))] + optgmc[3]
+fit.n<-g1(xb)
+data<-cbind(fit.n, bestmodel$model$y)#X,Y
+(gmc <- GMC(data)[2])
+```  
+
+$$sin(x)$$  
+
+```{r}
+g3<-function(x){
+  return(sin(x))
+}
+
+
+data<-cbind(g3(bestmodel$fitted.values),bestmodel$model$y)#X,Y
+GMC(data)#(GMC(X|Y),GMC(Y|X)) 
+#require(parallel)
+#optimal beta
+
+findopt<-function(lambda){
+  lambda1<-lambda[1];lambda2<-lambda[2]
+  fn<-function(beta){
+  xb= as.matrix(bestmodel$model[-1]) %*% beta[-1]+beta[1]
+  fit.n<-g3(xb)
+  resid<-bestmodel$model$y- fit.n
+  data<-cbind(fit.n,bestmodel$model$y)#X,Y
+  return(-GMC(data)[2]+ lambda1*var(fit.n,resid)+lambda2*sum(abs(beta)))
+ }
+  
+  opt<-optim(par = initials, fn =fn, method = "Nelder-Mead" )
+  return(c(lambda,opt$par,-opt$value))
+}
+
+OptEveryLambda3_b<-mclapply(lambda.set, FUN = findopt,mc.cores=4)
+class(OptEveryLambda3_b)
+save(OptEveryLambda3_b, file = "Rdata/OptEveryLambda3_b.RData")
+#colnames(OpetEveryLambda)[c(1,2,)]<- c("lambda1","lambda2","GMC(Y|G(X))+lasso")
+
+optgmc<-sapply(OptEveryLambda3_b, function(x) return(x[c(length(x))]))
+(optgmc<- OptEveryLambda3_b[[which.max(optgmc)]])
+
+xb<- as.matrix(bestmodel$model[-1]) %*% optgmc[c(-1,-2,-3,-length(optgmc))] + optgmc[3]
+fit.n<-g1(xb)
+data<-cbind(fit.n, bestmodel$model$y)#X,Y
+(gmc <- GMC(data)[2])
+
+```
+
+$$g(x)= x^2$$
+
+```{r}
+g4<-function(x){
+  return(x^2)
+}
+
+
+data<-cbind(g4(bestmodel$fitted.values),bestmodel$model$y)#X,Y
+GMC(data)#(GMC(X|Y),GMC(Y|X)) 
+#require(parallel)
+#optimal beta
+
+findopt<-function(lambda){
+  lambda1<-lambda[1];lambda2<-lambda[2]
+  fn<-function(beta){
+  xb= as.matrix(bestmodel$model[-1]) %*% beta[-1]+beta[1]
+  fit.n<-g4(xb)
+  resid<-bestmodel$model$y- fit.n
+  data<-cbind(fit.n,bestmodel$model$y)#X,Y
+  return(-GMC(data)[2]+ lambda1*var(fit.n,resid)+lambda2*sum(abs(beta)))
+ }
+  
+  opt<-optim(par = initials, fn =fn, method = "Nelder-Mead" )
+  return(c(lambda,opt$par,-opt$value))
+}
+
+OptEveryLambda4_b<-mclapply(lambda.set, FUN = findopt,mc.cores=4)
+class(OptEveryLambda4_b)
+save(OptEveryLambda4_b, file = "Rdata/OptEveryLambda4_b.RData")
+#colnames(OpetEveryLambda)[c(1,2,)]<- c("lambda1","lambda2","GMC(Y|G(X))+lasso")
+
+optgmc<-sapply(OptEveryLambda4_b, function(x) return(x[c(length(x))]))
+(optgmc<- OptEveryLambda4_b[[which.max(optgmc)]])
+
+xb<- as.matrix(bestmodel$model[-1]) %*% optgmc[c(-1,-2,-3,-length(optgmc))] + optgmc[3]
+fit.n<-g1(xb)
+data<-cbind(fit.n, bestmodel$model$y)#X,Y
+(gmc <- GMC(data)[2])
+
+```  
+
+
+$$g(x)=x^3$$
+
+```{r}
+g5<-function(x){
+  return(x^3)
+}
+
+
+data<-cbind(g4(bestmodel$fitted.values),bestmodel$model$y)#X,Y
+GMC(data)#(GMC(X|Y),GMC(Y|X)) 
+#require(parallel)
+#optimal beta
+
+findopt<-function(lambda){
+  lambda1<-lambda[1];lambda2<-lambda[2]
+  fn<-function(beta){
+  xb= as.matrix(bestmodel$model[-1]) %*% beta[-1]+beta[1]
+  fit.n<-g5(xb)
+  resid<-bestmodel$model$y- fit.n
+  data<-cbind(fit.n,bestmodel$model$y)#X,Y
+  return(-GMC(data)[2]+ lambda1*var(fit.n,resid)+lambda2*sum(abs(beta)))
+ }
+  
+  opt<-optim(par = initials, fn =fn, method = "Nelder-Mead" )
+  return(c(lambda,opt$par,-opt$value))
+}
+
+OptEveryLambda5_b<-mclapply(lambda.set, FUN = findopt,mc.cores=4)
+class(OptEveryLambda5_b)
+save(OptEveryLambda5_b, file = "Rdata/OptEveryLambda5_b.RData")
+#colnames(OpetEveryLambda)[c(1,2,)]<- c("lambda1","lambda2","GMC(Y|G(X))+lasso")
+
+optgmc<-sapply(OptEveryLambda5_b, function(x) return(x[c(length(x))]))
+(optgmc<- OptEveryLambda5_b[[which.max(optgmc)]])
+
+xb<- as.matrix(bestmodel$model[-1]) %*% optgmc[c(-1,-2,-3,-length(optgmc))] + optgmc[3]
+fit.n<-g1(xb)
+data<-cbind(fit.n, bestmodel$model$y)#X,Y
+(gmc <- GMC(data)[2])
 ```
 
 # 6.Combine, TP53  
@@ -837,13 +1427,11 @@ $$Maximize~~GMC(Y|g(X))-lambda (lasso)$$
 
 $$g(x)=x\\ linear~~ model$$ 
 
-take variable and initial beta from AIC model: b_aic_stepwise    
-
 ```{r,eval=TRUE}
 g1<-function(x){
   return(x)
 }
-source("GMC.R")
+source("Script/GMC.R")
 xb<- bestmodel$fitted.values
 data<-cbind(g1(xb),bestmodel$model$y)#X,Y
 GMC(data)#(GMC(X|Y),GMC(Y|X))
@@ -855,7 +1443,7 @@ GMC(data)#(GMC(X|Y),GMC(Y|X))
 (initials<-bestmodel$coefficients)#initial beta  
 require(parallel)
 #optimal beta
-rnge<- seq(0,2,by = 0.5)
+rnge<- seq(0,2,by = 0.5)#lambda range
 lambda1<- as.vector(sapply(rnge, function(x) rep(x,length(rnge))))
 lambda2<- rnge
 lambda.set <- rbind(lambda1, lambda2)
@@ -875,40 +1463,34 @@ findopt<-function(lambda){
   return(c(lambda,opt$par,-opt$value))
 }
 
-OptEveryLambda<-mclapply(lambda.set, FUN = findopt,mc.cores=4)
-class(OptEveryLambda)
-save(OptEveryLambda, file = "OptEveryLambda.RData")
-#colnames(OpetEveryLambda)[c(1,2,)]<- c("lambda1","lambda2","GMC(Y|G(X))")
+OptEveryLambda1_b<-mclapply(lambda.set, FUN = findopt,mc.cores=4)
+class(OptEveryLambda1_b)
+save(OptEveryLambda1_b, file = "Rdata/OptEveryLambda1_b.RData")
+#colnames(OpetEveryLambda)[c(1,2,)]<- c("lambda1","lambda2","GMC(Y|G(X))+lasso")
 
-fn<-function(beta){
-  xb= as.matrix(bestmodel$model[-1]) %*% beta[-1]+beta[1]
-  data<-cbind(g1(xb),bestmodel$model$y)#X,Y
-  return(-GMC(data)[2]+ lambda*sum(beta))#(GMC(X|Y),GMC(Y|X))
-  
-}
-opt<-optim(par = initials, fn =fn, method = "Nelder-Mead" )
-opt$par
--opt$value#optimal GMC(Y|X)
+optgmc<-sapply(OptEveryLambda1_b, function(x) return(x[c(length(x))]))
+(optgmc<- OptEveryLambda1_b[[which.max(optgmc)]])
+
+xb<- as.matrix(bestmodel$model[-1]) %*% optgmc[c(-1,-2,-3,-length(optgmc))] + optgmc[3]
+fit.n<-g1(xb)
+data<-cbind(fit.n, bestmodel$model$y)#X,Y
+(gmc <- GMC(data)[2])
 ```  
 
 
 $$g(x)= e^x Poisson~~ regression$$  
 
-use variable from bic model 
-
-```{r,eval=FALSE}
+```{r,eval=TRUE}
 g2<-function(x){
   return(exp(x))
 }
-poisson<- glm(y ~ ., family="poisson", data=bestmodel$model)
-initials<- poisson$coefficients
 
-data<-cbind(poisson$fitted.values,bestmodel$model$y)#X,Y
+data<-cbind(g2(bestmodel$fitted.values),bestmodel$model$y)#X,Y
 GMC(data)#(GMC(X|Y),GMC(Y|X)) 
 ```
 
 
-```{r,eval=FALSE}
+```{r,eval=TRUE}
 #require(parallel)
 #optimal beta
 
@@ -926,16 +1508,142 @@ findopt<-function(lambda){
   return(c(lambda,opt$par,-opt$value))
 }
 
-OptEveryLambda2<-mclapply(lambda.set, FUN = findopt,mc.cores=4)
-class(OptEveryLambda2)
-save(OptEveryLambda2, file = "OptEveryLambda2.RData")
-# fn<-function(beta){
-#   xb= as.matrix(bestmodel$model[-1]) %*% beta[-1]+beta[1]
-#   
-#   data<-cbind(g2(xb),bestmodel$model$y)#X,Y
-#   return(-GMC(data)[2]+ lambda*sum(beta))#(GMC(X|Y),GMC(Y|X))
-# }
-# opt<-optim(par = initials, fn =fn, method = "Nelder-Mead" )
-# opt$par
-# -opt$value#optimal GMC
+OptEveryLambda2_b<-mclapply(lambda.set, FUN = findopt,mc.cores=4)
+class(OptEveryLambda2_b)
+save(OptEveryLambda2_b, file = "Rdata/OptEveryLambda2_b.RData")
+#colnames(OpetEveryLambda)[c(1,2,)]<- c("lambda1","lambda2","GMC(Y|G(X))+lasso")
+
+optgmc<-sapply(OptEveryLambda2_b, function(x) return(x[c(length(x))]))
+(optgmc<- OptEveryLambda2_b[[which.max(optgmc)]])
+
+xb<- as.matrix(bestmodel$model[-1]) %*% optgmc[c(-1,-2,-3,-length(optgmc))] + optgmc[3]
+fit.n<-g1(xb)
+data<-cbind(fit.n, bestmodel$model$y)#X,Y
+(gmc <- GMC(data)[2])
+```  
+
+$$sin(x)$$  
+
+```{r}
+g3<-function(x){
+  return(sin(x))
+}
+
+
+data<-cbind(g3(bestmodel$fitted.values),bestmodel$model$y)#X,Y
+GMC(data)#(GMC(X|Y),GMC(Y|X)) 
+#require(parallel)
+#optimal beta
+
+findopt<-function(lambda){
+  lambda1<-lambda[1];lambda2<-lambda[2]
+  fn<-function(beta){
+  xb= as.matrix(bestmodel$model[-1]) %*% beta[-1]+beta[1]
+  fit.n<-g3(xb)
+  resid<-bestmodel$model$y- fit.n
+  data<-cbind(fit.n,bestmodel$model$y)#X,Y
+  return(-GMC(data)[2]+ lambda1*var(fit.n,resid)+lambda2*sum(abs(beta)))
+ }
+  
+  opt<-optim(par = initials, fn =fn, method = "Nelder-Mead" )
+  return(c(lambda,opt$par,-opt$value))
+}
+
+OptEveryLambda3_b<-mclapply(lambda.set, FUN = findopt,mc.cores=4)
+class(OptEveryLambda3_b)
+save(OptEveryLambda3_b, file = "Rdata/OptEveryLambda3_b.RData")
+#colnames(OpetEveryLambda)[c(1,2,)]<- c("lambda1","lambda2","GMC(Y|G(X))+lasso")
+
+optgmc<-sapply(OptEveryLambda3_b, function(x) return(x[c(length(x))]))
+(optgmc<- OptEveryLambda3_b[[which.max(optgmc)]])
+
+xb<- as.matrix(bestmodel$model[-1]) %*% optgmc[c(-1,-2,-3,-length(optgmc))] + optgmc[3]
+fit.n<-g1(xb)
+data<-cbind(fit.n, bestmodel$model$y)#X,Y
+(gmc <- GMC(data)[2])
+
+```
+
+$$g(x)= x^2$$
+
+```{r}
+g4<-function(x){
+  return(x^2)
+}
+
+
+data<-cbind(g4(bestmodel$fitted.values),bestmodel$model$y)#X,Y
+GMC(data)#(GMC(X|Y),GMC(Y|X)) 
+#require(parallel)
+#optimal beta
+
+findopt<-function(lambda){
+  lambda1<-lambda[1];lambda2<-lambda[2]
+  fn<-function(beta){
+  xb= as.matrix(bestmodel$model[-1]) %*% beta[-1]+beta[1]
+  fit.n<-g4(xb)
+  resid<-bestmodel$model$y- fit.n
+  data<-cbind(fit.n,bestmodel$model$y)#X,Y
+  return(-GMC(data)[2]+ lambda1*var(fit.n,resid)+lambda2*sum(abs(beta)))
+ }
+  
+  opt<-optim(par = initials, fn =fn, method = "Nelder-Mead" )
+  return(c(lambda,opt$par,-opt$value))
+}
+
+OptEveryLambda4_b<-mclapply(lambda.set, FUN = findopt,mc.cores=4)
+class(OptEveryLambda4_b)
+save(OptEveryLambda4_b, file = "Rdata/OptEveryLambda4_b.RData")
+#colnames(OpetEveryLambda)[c(1,2,)]<- c("lambda1","lambda2","GMC(Y|G(X))+lasso")
+
+optgmc<-sapply(OptEveryLambda4_b, function(x) return(x[c(length(x))]))
+(optgmc<- OptEveryLambda4_b[[which.max(optgmc)]])
+
+xb<- as.matrix(bestmodel$model[-1]) %*% optgmc[c(-1,-2,-3,-length(optgmc))] + optgmc[3]
+fit.n<-g1(xb)
+data<-cbind(fit.n, bestmodel$model$y)#X,Y
+(gmc <- GMC(data)[2])
+
+```  
+
+
+$$g(x)=x^3$$
+
+```{r}
+g5<-function(x){
+  return(x^3)
+}
+
+
+data<-cbind(g4(bestmodel$fitted.values),bestmodel$model$y)#X,Y
+GMC(data)#(GMC(X|Y),GMC(Y|X)) 
+#require(parallel)
+#optimal beta
+
+findopt<-function(lambda){
+  lambda1<-lambda[1];lambda2<-lambda[2]
+  fn<-function(beta){
+  xb= as.matrix(bestmodel$model[-1]) %*% beta[-1]+beta[1]
+  fit.n<-g5(xb)
+  resid<-bestmodel$model$y- fit.n
+  data<-cbind(fit.n,bestmodel$model$y)#X,Y
+  return(-GMC(data)[2]+ lambda1*var(fit.n,resid)+lambda2*sum(abs(beta)))
+ }
+  
+  opt<-optim(par = initials, fn =fn, method = "Nelder-Mead" )
+  return(c(lambda,opt$par,-opt$value))
+}
+
+OptEveryLambda5_b<-mclapply(lambda.set, FUN = findopt,mc.cores=4)
+class(OptEveryLambda5_b)
+save(OptEveryLambda5_b, file = "Rdata/OptEveryLambda5_b.RData")
+#colnames(OpetEveryLambda)[c(1,2,)]<- c("lambda1","lambda2","GMC(Y|G(X))+lasso")
+
+optgmc<-sapply(OptEveryLambda5_b, function(x) return(x[c(length(x))]))
+(optgmc<- OptEveryLambda5_b[[which.max(optgmc)]])
+
+xb<- as.matrix(bestmodel$model[-1]) %*% optgmc[c(-1,-2,-3,-length(optgmc))] + optgmc[3]
+fit.n<-g1(xb)
+data<-cbind(fit.n, bestmodel$model$y)#X,Y
+(gmc <- GMC(data)[2])
 ```
