@@ -47,11 +47,12 @@ set_combine_scale$response = set_combine$response
 
 # 1.Set b, response
 
-
 ## BEST LM  
 
 ```{r,eval=TRUE}
-bestmodel<-load("./Rdata/b_aic_stepwise.RData")
+load("./Rdata/b_aic_stepwise.RData")
+bestmodel<- b_aic_stepwise 
+  
 ```
 
 ## GLM
@@ -127,11 +128,11 @@ findopt<-function(lambda){
   return(c(lambda,opt$par,-opt$value))
 }
 
-OptEveryLambda1_b<-mclapply(lambda.set, FUN = findopt,mc.cores=4)
-class(OptEveryLambda1_b)
-save(OptEveryLambda1_b, file = "Rdata/OptEveryLambda1_b.RData")
+#OptEveryLambda1_b<-mclapply(lambda.set, FUN = findopt,mc.cores=4)
+#class(OptEveryLambda1_b)
+#save(OptEveryLambda1_b, file = "Rdata/OptEveryLambda1_b.RData")
 #colnames(OpetEveryLambda)[c(1,2,)]<- c("lambda1","lambda2","GMC(Y|G(X))+lasso")
-
+load("Rdata/OptEveryLambda1_b.RData")
 optgmc<-sapply(OptEveryLambda1_b, function(x) return(x[c(length(x))]))
 (optgmc<- OptEveryLambda1_b[[which.max(optgmc)]])
 
@@ -172,11 +173,11 @@ findopt<-function(lambda){
   return(c(lambda,opt$par,-opt$value))
 }
 
-OptEveryLambda2_b<-mclapply(lambda.set, FUN = findopt,mc.cores=4)
-class(OptEveryLambda2_b)
-save(OptEveryLambda2_b, file = "Rdata/OptEveryLambda2_b.RData")
+# OptEveryLambda2_b<-mclapply(lambda.set, FUN = findopt,mc.cores=4)
+# class(OptEveryLambda2_b)
+# save(OptEveryLambda2_b, file = "Rdata/OptEveryLambda2_b.RData")
 #colnames(OpetEveryLambda)[c(1,2,)]<- c("lambda1","lambda2","GMC(Y|G(X))+lasso")
-
+load("Rdata/OptEveryLambda2_b.RData")
 optgmc<-sapply(OptEveryLambda2_b, function(x) return(x[c(length(x))]))
 (optgmc<- OptEveryLambda2_b[[which.max(optgmc)]])
 
@@ -213,10 +214,11 @@ findopt<-function(lambda){
   return(c(lambda,opt$par,-opt$value))
 }
 
-OptEveryLambda3_b<-mclapply(lambda.set, FUN = findopt,mc.cores=4)
-class(OptEveryLambda3_b)
-save(OptEveryLambda3_b, file = "Rdata/OptEveryLambda3_b.RData")
+# OptEveryLambda3_b<-mclapply(lambda.set, FUN = findopt,mc.cores=4)
+# class(OptEveryLambda3_b)
+# save(OptEveryLambda3_b, file = "Rdata/OptEveryLambda3_b.RData")
 #colnames(OpetEveryLambda)[c(1,2,)]<- c("lambda1","lambda2","GMC(Y|G(X))+lasso")
+load("Rdata/OptEveryLambda3_b.RData")
 
 optgmc<-sapply(OptEveryLambda3_b, function(x) return(x[c(length(x))]))
 (optgmc<- OptEveryLambda3_b[[which.max(optgmc)]])
@@ -255,10 +257,12 @@ findopt<-function(lambda){
   return(c(lambda,opt$par,-opt$value))
 }
 
-OptEveryLambda4_b<-mclapply(lambda.set, FUN = findopt,mc.cores=4)
-class(OptEveryLambda4_b)
-save(OptEveryLambda4_b, file = "Rdata/OptEveryLambda4_b.RData")
+# OptEveryLambda4_b<-mclapply(lambda.set, FUN = findopt,mc.cores=4)
+# class(OptEveryLambda4_b)
+# save(OptEveryLambda4_b, file = "Rdata/OptEveryLambda4_b.RData")
 #colnames(OpetEveryLambda)[c(1,2,)]<- c("lambda1","lambda2","GMC(Y|G(X))+lasso")
+
+load("Rdata/OptEveryLambda4_b.RData")
 
 optgmc<-sapply(OptEveryLambda4_b, function(x) return(x[c(length(x))]))
 (optgmc<- OptEveryLambda4_b[[which.max(optgmc)]])
@@ -298,11 +302,12 @@ findopt<-function(lambda){
   return(c(lambda,opt$par,-opt$value))
 }
 
-OptEveryLambda5_b<-mclapply(lambda.set, FUN = findopt,mc.cores=4)
-class(OptEveryLambda5_b)
-save(OptEveryLambda5_b, file = "Rdata/OptEveryLambda5_b.RData")
+# OptEveryLambda5_b<-mclapply(lambda.set, FUN = findopt,mc.cores=4)
+# class(OptEveryLambda5_b)
+# save(OptEveryLambda5_b, file = "Rdata/OptEveryLambda5_b.RData")
 #colnames(OpetEveryLambda)[c(1,2,)]<- c("lambda1","lambda2","GMC(Y|G(X))+lasso")
 
+load("Rdata/OptEveryLambda5_b.RData")
 optgmc<-sapply(OptEveryLambda5_b, function(x) return(x[c(length(x))]))
 (optgmc<- OptEveryLambda5_b[[which.max(optgmc)]])
 
@@ -318,7 +323,9 @@ data<-cbind(fit.n, bestmodel$model$y)#X,Y
 ## BEST LM  
 
 ```{r,eval=TRUE}
-bestmodel<-load("./Rdata/c_aic_stepwise.RData")
+rm(list = ls())
+load("./Rdata/c_aic_stepwise.RData")
+bestmodel<- c_aic_stepwise
 ```
 
 ## GLM
@@ -368,7 +375,6 @@ data<-cbind(g1(xb),bestmodel$model$y)#X,Y
 GMC(data)#(GMC(X|Y),GMC(Y|X))
 ```
 
-
 ```{r,eval=TRUE}
 #optimal beta
 (initials<-bestmodel$coefficients)#initial beta  
@@ -394,11 +400,11 @@ findopt<-function(lambda){
   return(c(lambda,opt$par,-opt$value))
 }
 
-OptEveryLambda1_c<-mclapply(lambda.set, FUN = findopt,mc.cores=4)
-class(OptEveryLambda1_c)
-save(OptEveryLambda1_c, file = "Rdata/OptEveryLambda1_c.RData")
+# OptEveryLambda1_c<-mclapply(lambda.set, FUN = findopt,mc.cores=4)
+# class(OptEveryLambda1_c)
+# save(OptEveryLambda1_c, file = "Rdata/OptEveryLambda1_c.RData")
 #colnames(OpetEveryLambda)[c(1,2,)]<- c("lambda1","lambda2","GMC(Y|G(X))+lasso")
-
+load("Rdata/OptEveryLambda1_c.RData")
 optgmc<-sapply(OptEveryLambda1_c, function(x) return(x[c(length(x))]))
 (optgmc<- OptEveryLambda1_c[[which.max(optgmc)]])
 
@@ -439,11 +445,11 @@ findopt<-function(lambda){
   return(c(lambda,opt$par,-opt$value))
 }
 
-OptEveryLambda2_c<-mclapply(lambda.set, FUN = findopt,mc.cores=4)
-class(OptEveryLambda2_c)
-save(OptEveryLambda2_c, file = "Rdata/OptEveryLambda2_c.RData")
+# OptEveryLambda2_c<-mclapply(lambda.set, FUN = findopt,mc.cores=4)
+# class(OptEveryLambda2_c)
+# save(OptEveryLambda2_c, file = "Rdata/OptEveryLambda2_c.RData")
 #colnames(OpetEveryLambda)[c(1,2,)]<- c("lambda1","lambda2","GMC(Y|G(X))+lasso")
-
+load("Rdata/OptEveryLambda2_c.RData")
 optgmc<-sapply(OptEveryLambda2_c, function(x) return(x[c(length(x))]))
 (optgmc<- OptEveryLambda2_c[[which.max(optgmc)]])
 
@@ -480,11 +486,11 @@ findopt<-function(lambda){
   return(c(lambda,opt$par,-opt$value))
 }
 
-OptEveryLambda3_c<-mclapply(lambda.set, FUN = findopt,mc.cores=4)
-class(OptEveryLambda3_c)
-save(OptEveryLambda3_c, file = "Rdata/OptEveryLambda3_c.RData")
+# OptEveryLambda3_c<-mclapply(lambda.set, FUN = findopt,mc.cores=4)
+# class(OptEveryLambda3_c)
+# save(OptEveryLambda3_c, file = "Rdata/OptEveryLambda3_c.RData")
 #colnames(OpetEveryLambda)[c(1,2,)]<- c("lambda1","lambda2","GMC(Y|G(X))+lasso")
-
+load("Rdata/OptEveryLambda3_c.RData")
 optgmc<-sapply(OptEveryLambda3_c, function(x) return(x[c(length(x))]))
 (optgmc<- OptEveryLambda3_c[[which.max(optgmc)]])
 
@@ -522,11 +528,11 @@ findopt<-function(lambda){
   return(c(lambda,opt$par,-opt$value))
 }
 
-OptEveryLambda4_c<-mclapply(lambda.set, FUN = findopt,mc.cores=4)
-class(OptEveryLambda4_c)
-save(OptEveryLambda4_c, file = "Rdata/OptEveryLambda4_c.RData")
+# OptEveryLambda4_c<-mclapply(lambda.set, FUN = findopt,mc.cores=4)
+# class(OptEveryLambda4_c)
+# save(OptEveryLambda4_c, file = "Rdata/OptEveryLambda4_c.RData")
 #colnames(OpetEveryLambda)[c(1,2,)]<- c("lambda1","lambda2","GMC(Y|G(X))+lasso")
-
+load("Rdata/OptEveryLambda4_c.RData")
 optgmc<-sapply(OptEveryLambda4_c, function(x) return(x[c(length(x))]))
 (optgmc<- OptEveryLambda4_c[[which.max(optgmc)]])
 
@@ -565,11 +571,11 @@ findopt<-function(lambda){
   return(c(lambda,opt$par,-opt$value))
 }
 
-OptEveryLambda5_c<-mclapply(lambda.set, FUN = findopt,mc.cores=4)
-class(OptEveryLambda5_c)
-save(OptEveryLambda5_c, file = "Rdata/OptEveryLambda5_c.RData")
+# OptEveryLambda5_c<-mclapply(lambda.set, FUN = findopt,mc.cores=4)
+# class(OptEveryLambda5_c)
+# save(OptEveryLambda5_c, file = "Rdata/OptEveryLambda5_c.RData")
 #colnames(OpetEveryLambda)[c(1,2,)]<- c("lambda1","lambda2","GMC(Y|G(X))+lasso")
-
+load("Rdata/OptEveryLambda5_c.RData")
 optgmc<-sapply(OptEveryLambda5_c, function(x) return(x[c(length(x))]))
 (optgmc<- OptEveryLambda5_c[[which.max(optgmc)]])
 
@@ -584,7 +590,9 @@ data<-cbind(fit.n, bestmodel$model$y)#X,Y
 ## BEST LM  
 
 ```{r,eval=TRUE}
-bestmodel<-load("./Rdata/combine_aic_stepwise.RData")
+rm(list = ls())
+load("./Rdata/combine_aic_stepwise.RData")
+bestmodel<-combine_aic_stepwise
 ```
 
 ## GLM
@@ -850,7 +858,8 @@ data<-cbind(fit.n, bestmodel$model$y)#X,Y
 ## BEST LM  
 
 ```{r,eval=TRUE}
-bestmodel<-load("./Rdata/b_aic_forward_t.RData")
+load("./Rdata/b_aic_forward_t.RData")
+bestmodel<- b_aic_forward_t
 ```
 
 ## GLM
@@ -1111,11 +1120,13 @@ data<-cbind(fit.n, bestmodel$model$y)#X,Y
 (gmc <- GMC(data)[2])
 ```
 
-# 5.Set C, TP53 
+# 5.Set C, TP53   
+
 ## BEST LM  
 
 ```{r,eval=TRUE}
-bestmodel<-load("./Rdata/c_aic_stepwise_t.RData")
+load("./Rdata/c_aic_stepwise_t.RData")
+bestmodel<- c_aic_stepwise_t
 ```
 
 ## GLM
@@ -1381,7 +1392,8 @@ data<-cbind(fit.n, bestmodel$model$y)#X,Y
 ## BEST LM  
 
 ```{r,eval=TRUE}
-bestmodel<-load("./Rdata/combine_aic_forward_t.RData")
+load("./Rdata/combine_aic_forward_t.RData")
+bestmodel<- combine_aic_forward_t
 ```
 
 ## GLM
