@@ -74,14 +74,14 @@ m1_b = lm(y ~ 1, data = set_b_log)#initial model
 n = dim(set_b_log)[1]
 
 # forward
-b_aic_forward = step(object = m1_b, scope = formula(m0_b), direction="forward") 
+b_aic_forward = step(object = m1_b, scope = formula(m0_b), direction="forward",trace = 0) 
 summary(b_aic_forward)
 plot(b_aic_forward, which = 4)
 outlierTest(b_aic_forward)
 which(abs(rstudent(b_aic_forward)) >= qt(0.05/2, dim(set_b_log)[1] - dim(set_b_log)[2] - 1, lower.tail = FALSE))
 
 # backward
-b_aic_backward = step(m0_b, direction="backward") 
+b_aic_backward = step(m0_b, direction="backward",trace = 0) 
 summary(b_aic_backward) # largest adj-Rsquared
 plot(b_aic_backward, which = 4)
 outlierTest(b_aic_backward)
@@ -551,7 +551,7 @@ bestmodel<-b_aic_stepwise
 ```
 
 
-```{r,eval=FALSE}
+```{r}
 dd.log<- bestmodel$model
 dd.log<- cbind(select(dd.log,-y),select(dd.log,y))
 ```
@@ -559,7 +559,7 @@ dd.log<- cbind(select(dd.log,-y),select(dd.log,y))
 
 *logit*
 
-```{r,eval=FALSE}
+```{r,eval=TRUE}
 hist(dd.log$y)#take 6.5 as thrshold
 threshold<-6.5
 dd.log<-mutate(dd.log,y=ifelse(y<6.5,0,1))
@@ -578,11 +578,14 @@ find the optimal subset of X which make the $GMC(Y|X_{sub})$ or $GMC(Y|G(X_{sub}
 subset: from the previous results  
 link function(g())
 
+
+$$Maximize~~GMC(Y|g(X))-lambda (lasso)$$
+
 $$g(x)=x\\ linear~~ model$$ 
 
 take variable and initial beta from AIC model: b_aic_stepwise    
 
-```{r,eval=FALSE}
+```{r}
 g1<-function(x){
   return(x)
 }
@@ -593,13 +596,39 @@ GMC(data)#(GMC(X|Y),GMC(Y|X))
 ```
 
 
-```{r,eval=FALSE}
+```{r,eval=TRUE}
 #optimal beta
 (initials<-bestmodel$coefficients)#initial beta  
+require(parallel)
+require(reshape2)
+#optimal beta
+rnge<- seq(0,2,by = 0.1)
+lambda1<- as.vector(sapply(rnge, function(x) rep(x,length(rnge))))
+lambda2<- rnge
+lambda.set <- rbind(lambda1, lambda2)
+lambda.set <- as.data.frame(lambda.set)
+
+findopt<-function(lambda){
+  lambda1<-lambda[1];lambda2<-lambda[2]
+  fn<-function(beta){
+  xb= as.matrix(bestmodel$model[-1]) %*% beta[-1]+beta[1]
+  resid<-bestmodel$model$y-g1(xb)
+  fit.n<-g1(xb)
+  data<-cbind(fit.n,bestmodel$model$y)#X,Y
+  return(-GMC(data)[2]+ lambda1*var(fit.n,resid)+lambda2*sum(abs(beta)))
+ }
+  
+  opt<-optim(par = initials, fn =fn, method = "Nelder-Mead" )
+  return(c(lambda,opt$par,-opt$value))
+}
+
+OptEveryLambda<-mclapply(lambda.set, FUN = findopt,mc.cores=2)
+colnames(OpetEveryLambda)<- c("lambda","","GMC(Y|G(X))")
+
 fn<-function(beta){
   xb= as.matrix(bestmodel$model[-1]) %*% beta[-1]+beta[1]
   data<-cbind(g1(xb),bestmodel$model$y)#X,Y
-  return(-GMC(data)[2])#(GMC(X|Y),GMC(Y|X))
+  return(-GMC(data)[2]+ lambda*sum(beta))#(GMC(X|Y),GMC(Y|X))
   
 }
 opt<-optim(par = initials, fn =fn, method = "Nelder-Mead" )
@@ -612,7 +641,7 @@ $$g(x)= e^x Poisson~~ regression$$
 
 use variable from bic model 
 
-```{r,eval=FALSE}
+```{r,eval=TRUE}
 g2<-function(x){
   return(exp(x))
 }
@@ -624,15 +653,33 @@ GMC(data)#(GMC(X|Y),GMC(Y|X))
 ```
 
 
-```{r,eval=FALSE}
+```{r,eval=TRUE}
+require(parallel)
 #optimal beta
-fn<-function(beta){
+lambda.set<- seq(0,10,by = 0.01)
+
+findopt<-function(lambda){
+  
+  fn<-function(beta){
   xb= as.matrix(bestmodel$model[-1]) %*% beta[-1]+beta[1]
   
   data<-cbind(g2(xb),bestmodel$model$y)#X,Y
-  return(-GMC(data)[2])#(GMC(X|Y),GMC(Y|X))
+  return(-GMC(data)[2]+ lambda*sum(abs(beta)))#(GMC(X|Y),GMC(Y|X))
+  }
+  
+  opt<-optim(par = initials, fn =fn, method = "Nelder-Mead" )
+  return(c(lambda,opt$par,-opt$value))
 }
-opt<-optim(par = initials, fn =fn, method = "Nelder-Mead" )
-opt$par
--opt$value#optimal GMC
+OptEveryLambda<-t(sapply(lambda.set, FUN = findopt ));
+OptEveryLambda<-t() mclapply(lambda.set, FUN = findopt,mc.cores=detectCores())
+colnames(OpetEveryLambda)<- c("lambda","","GMC(Y|G(X))")
+# fn<-function(beta){
+#   xb= as.matrix(bestmodel$model[-1]) %*% beta[-1]+beta[1]
+#   
+#   data<-cbind(g2(xb),bestmodel$model$y)#X,Y
+#   return(-GMC(data)[2]+ lambda*sum(beta))#(GMC(X|Y),GMC(Y|X))
+# }
+# opt<-optim(par = initials, fn =fn, method = "Nelder-Mead" )
+# opt$par
+# -opt$value#optimal GMC
 ```
