@@ -51,8 +51,7 @@ set_combine_scale$response = set_combine$response
 ## BEST LM  
 
 ```{r,eval=TRUE}
-load("./Rdata/b_aic_stepwise.RData")
-bestmodel<-b_aic_stepwise
+bestmodel<-load("./Rdata/b_aic_stepwise.RData")
 ```
 
 ## GLM
@@ -319,8 +318,7 @@ data<-cbind(fit.n, bestmodel$model$y)#X,Y
 ## BEST LM  
 
 ```{r,eval=TRUE}
-load("./Rdata/c_aic_stepwise.RData")
-bestmodel<-b_aic_stepwise
+bestmodel<-load("./Rdata/c_aic_stepwise.RData")
 ```
 
 ## GLM
@@ -586,8 +584,7 @@ data<-cbind(fit.n, bestmodel$model$y)#X,Y
 ## BEST LM  
 
 ```{r,eval=TRUE}
-load("./Rdata/combine_aic_stepwise.RData")
-bestmodel<-b_aic_stepwise
+bestmodel<-load("./Rdata/combine_aic_stepwise.RData")
 ```
 
 ## GLM
@@ -853,8 +850,7 @@ data<-cbind(fit.n, bestmodel$model$y)#X,Y
 ## BEST LM  
 
 ```{r,eval=TRUE}
-load("./Rdata/b_aic_forward_t.RData")
-bestmodel<-b_aic_stepwise
+bestmodel<-load("./Rdata/b_aic_forward_t.RData")
 ```
 
 ## GLM
@@ -1119,8 +1115,7 @@ data<-cbind(fit.n, bestmodel$model$y)#X,Y
 ## BEST LM  
 
 ```{r,eval=TRUE}
-load("./Rdata/c_aic_stepwise_t.RData")
-bestmodel<-b_aic_stepwise
+bestmodel<-load("./Rdata/c_aic_stepwise_t.RData")
 ```
 
 ## GLM
@@ -1386,8 +1381,7 @@ data<-cbind(fit.n, bestmodel$model$y)#X,Y
 ## BEST LM  
 
 ```{r,eval=TRUE}
-load("./Rdata/combine_aic_forward_t.RData")
-bestmodel<-b_aic_stepwise
+bestmodel<-load("./Rdata/combine_aic_forward_t.RData")
 ```
 
 ## GLM
