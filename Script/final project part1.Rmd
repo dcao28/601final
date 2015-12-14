@@ -6,9 +6,9 @@ output: html_document
 ```{r}
 rm(list = ls())
 ## data preprocessing 
-set_b = read.csv("Set_b.csv", header = TRUE)
-set_c = read.csv("Set_c.csv", header = TRUE) # set c has TP53
-tp53 = read.csv("TP53.csv", header = TRUE) 
+set_b = read.csv("../data/Set_b.csv", header = TRUE)
+set_c = read.csv("../data/Set_c.csv", header = TRUE) # set c has TP53
+tp53 = read.csv("../data/TP53.csv", header = TRUE) 
 set_b = set_b[-which(set_b$response == 0),]
 set_c = set_c[-which(set_c$response == 0),]
 set_b_scale = data.frame(scale(set_b[,-1]))
@@ -36,6 +36,7 @@ hist(log(set_b_scale$response), main = "Histogram of log(response) (Set B)", xla
 set_b_log = mutate(y=log(response),.data = set_b_scale)#new y
 set_b_log = select(set_b_log,-response)
 set_b_log$y = scale(set_b_log$y)
+save(set_b_log,file = "../data/set_b_log.RData")
 
 ## fitting full model
 m_b = lm(response~., data = set_b_scale)
@@ -170,26 +171,28 @@ b_pls_dataframe = data.frame(unclass(b_pls$scores))
 b_pls_dataframe$y = set_b_log$y
 b_pls_cv = cv.lm(data = b_pls_dataframe, form.lm = y ~ ., m = 10) #1.01
 
+## LASSO
+require(glmnet)
+grid=10^seq(10,-10,length=100)
+b_lasso_cv = cv.glmnet(model.matrix(b_aic_stepwise)[,-1], set_b_log$y, lambda = grid)
+b_lasso = glmnet(model.matrix(b_aic_stepwise)[,-1], set_b_log$y, lambda = b_lasso_cv$lambda.min)
+summary(b_lasso)
+
 ## Comparing CV
-mean((b_aic_forward_cv$cvpred-b_aic_forward_cv$y)^2) # value of overall CV
+mean((b_aic_forward_cv$cvpred-b_aic_forward_cv$y)^2) 
 mean((b_aic_backward_cv$cvpred-b_aic_backward_cv$y)^2)
-mean((b_aic_stepwise_cv$cvpred-b_aic_stepwise_cv$y)^2) # best
+mean((b_aic_stepwise_cv$cvpred-b_aic_stepwise_cv$y)^2) # best 
 mean((b_bic_forward_cv$cvpred-b_bic_forward_cv$y)^2)
 mean((b_bic_backward_cv$cvpred-b_bic_forward_cv$y)^2)
 mean((b_bic_stepwise_cv$cvpred-b_bic_stepwise_cv$y)^2) 
 mean((b_pcr_cv$cvpred-b_pcr_cv$y)^2)
 mean((b_pls_cv$cvpred-b_pls_cv$y)^2)
+b_lasso_cv$cvm[which(b_lasso_cv$lambda == b_lasso_cv$lambda.min)]
+b_lasso_fitted_value = model.matrix(b_aic_stepwise)[,-1] %*% b_lasso$beta
+plot(b_lasso_fitted_value, b_lasso_fitted_value - set_b_log$y, main = "Residuals vs Fitted (Set B, response, LASSO)", xlab = "Fitted values", ylab = "Residuals")
+vif(b_lasso)
 
-## LASSO
-require(glmnet)
-grid=10^seq(10,-10,length=100)
-b_lasso = glmnet(model.matrix(b_aic_stepwise)[,-1], set_b_log$y, alpha = 1, lambda = grid)
-summary(b_lasso)
-plot(b_lasso, main = "Lasso (Set B, response)" )
-b_lasso_coef=predict(b_lasso,type="coefficients",s=bestlam)
-b_lasso_coef
-
-save(b_aic_stepwise, file = "b_aic_stepwise.RData")
+save(b_bic_backward, file = "b_bic_backward.RData")
 ```
 
 ** Set C, response **
@@ -200,6 +203,7 @@ hist(log(set_c_scale$response), main = "Histogram of log(response) (Set C)", xla
 set_c_log = mutate(y=log(response),.data = set_c_scale)#new y
 set_c_log = select(set_c_log,-response)
 set_c_log$y = scale(set_c_log$y)
+save(set_c_log,file = "../data/set_c_log.RData")
 
 ## fitting full model
 m_c = lm(response~., data = set_c_scale)
@@ -315,24 +319,26 @@ c_pls_dataframe = data.frame(unclass(c_pls$scores))
 c_pls_dataframe$y = set_c_log$y
 c_pls_cv = cv.lm(data = c_pls_dataframe, form.lm = y ~ ., m = 10) #0.957
 
+## LASSO
+c_lasso_cv = cv.glmnet(model.matrix(c_aic_stepwise)[,-1], set_c_log$y, lambda = grid)
+c_lasso = glmnet(model.matrix(c_aic_stepwise)[,-1], set_c_log$y, lambda = c_lasso_cv$lambda.min)
+summary(c_lasso)
+
 ## Comparing CV
 mean((c_aic_forward_cv$cvpred-c_aic_forward_cv$y)^2)
 mean((c_aic_backward_cv$cvpred-c_aic_backward_cv$y)^2)
-mean((c_aic_stepwise_cv$cvpred-c_aic_stepwise_cv$y)^2)
+mean((c_aic_stepwise_cv$cvpred-c_aic_stepwise_cv$y)^2) # best
 mean((c_bic_forward_cv$cvpred-c_bic_forward_cv$y)^2)
 mean((c_pcr_cv$cvpred-c_pcr_cv$y)^2)
 mean((c_pls_cv$cvpred-c_pls_cv$y)^2)
+c_lasso_cv$cvm[which(c_lasso_cv$lambda == c_lasso_cv$lambda.min)]
 
 # c_aic_forward and c_aic_stepwise have the same CV.  However, c_aic_stepwise has larger adj R-squared.(0.137)
 
-## LASSO
-c_lasso = glmnet(model.matrix(c_aic_stepwise)[,-1], set_c_log$y, alpha = 1, lambda = grid)
-summary(c_lasso)
-plot(c_lasso)
-c_lasso_coef=predict(c_lasso,type="coefficients",s=bestlam)
-c_lasso_coef
+c_lasso_fitted_value = model.matrix(c_aic_stepwise)[,-1] %*% c_lasso$beta
+plot(c_lasso_fitted_value, c_lasso_fitted_value - set_c_log$y, main = "Residuals vs Fitted (Set C, response, LASSO)", xlab = "Fitted values", ylab = "Residuals")
 
-save(c_aic_stepwise, file = "c_aic_stepwise.RData")
+save(c_bic_forward, file = "c_bic_forward.RData")
 ```
 
 
@@ -342,6 +348,7 @@ save(c_aic_stepwise, file = "c_aic_stepwise.RData")
 set_b_t = set_b_log[,-201]
 names(tp53_scale) = "TP53"
 set_b_t$TP53 = tp53_scale$TP53
+save(set_b_t,file = "../data/set_b_t.RData")
 
 ## fitting full model
 m0_b_t = lm(TP53 ~ ., data = set_b_t)
@@ -480,6 +487,11 @@ b_pls_dataframe_t = data.frame(unclass(b_pls_t$scores))
 b_pls_dataframe_t$TP53 = set_b_t$TP53
 b_pls_cv_t = cv.lm(data = b_pls_dataframe_t, form.lm = TP53 ~ ., m = 10) #0.763
 
+## LASSO
+b_lasso_cv_t = cv.glmnet(model.matrix(b_aic_forward_t)[,-1], set_b_t$TP53, lambda = grid)
+b_lasso_t = glmnet(model.matrix(b_aic_forward_t)[,-1], set_b_t$TP53, lambda = b_lasso_cv_t$lambda.min)
+summary(b_lasso_t)
+
 ## Comparing CV
 mean((b_aic_forward_cv_t$cvpred-b_aic_forward_cv_t$TP53)^2) # best
 mean((b_aic_backward_cv_t$cvpred-b_aic_backward_cv_t$TP53)^2)
@@ -489,22 +501,18 @@ mean((b_bic_backward_cv_t$cvpred-b_bic_backward_cv_t$TP53)^2)
 mean((b_bic_stepwise_cv_t$cvpred-b_bic_stepwise_cv_t$TP53)^2)
 mean((b_pcr_cv_t$cvpred-b_pcr_cv_t$TP53)^2)
 mean((b_pls_cv_t$cvpred-b_pls_cv_t$TP53)^2)
+b_lasso_cv_t$cvm[which(b_lasso_cv_t$lambda == b_lasso_cv_t$lambda.min)]
+b_lasso_fitted_value_t = model.matrix(b_aic_forward_t)[,-1] %*% b_lasso_t$beta
+plot(b_lasso_fitted_value_t, b_lasso_fitted_value_t - set_b_t$TP53, main = "Residuals vs Fitted (Set B, TP53, LASSO)", xlab = "Fitted values", ylab = "Residuals")
 
-## LASSO
-b_lasso_t = glmnet(model.matrix(b_aic_forward_t)[,-1], set_b_t$TP53, alpha = 1, lambda = grid)
-summary(b_lasso_t)
-plot(b_lasso_t)
-b_lasso_coef_t=predict(b_lasso_t,type="coefficients",s=bestlam)
-b_lasso_coef_t
-
-save(b_aic_forward_t, file = "b_aic_forward_t.RData")
+save(b_bic_backward_t,file = "b_bic_backward_t.RData")
 ```
 
 
 ** Set C, TP53 **
 ```{r}
 set_c_t = set_c_scale[,-201]
-
+save(set_c_t,file = "../data/set_c_t.RData")
 ## fitting full model
 m0_c_t = lm(TP53 ~ ., data = set_c_t)
 layout(matrix(data = c(1,2,3,4), ncol = 2, byrow = TRUE))
@@ -630,16 +638,6 @@ c_pls_dataframe_t = data.frame(unclass(c_pls_t$scores))
 c_pls_dataframe_t$TP53 = set_c_t$TP53
 c_pls_cv_t = cv.lm(data = c_pls_dataframe_t, form.lm = TP53 ~ ., m = 10) #0.737
 
-## Comparing CV
-mean((c_aic_forward_cv_t$cvpred-c_aic_forward_cv_t$TP53)^2)
-mean((c_aic_backward_cv_t$cvpred-c_aic_backward_cv_t$TP53)^2)
-mean((c_aic_stepwise_cv_t$cvpred-c_aic_stepwise_cv_t$TP53)^2)
-mean((c_bic_forward_cv_t$cvpred-c_bic_forward_cv_t$TP53)^2)
-mean((c_bic_backward_cv_t$cvpred-c_bic_backward_cv_t$TP53)^2)
-mean((c_bic_stepwise_cv_t$cvpred-c_bic_stepwise_cv_t$TP53)^2)
-mean((c_pcr_cv_t$cvpred-c_pcr_cv_t$TP53)^2)
-mean((c_pls_cv_t$cvpred-c_pls_cv_t$TP53)^2) # best
-
 ## PLS decomposition
 loadings = as.matrix(c_pls_t$loadings)
 c_pls_beta = apply(X = loadings, MARGIN = 1, FUN = sum)
@@ -647,16 +645,27 @@ names(c_pls_beta[c_pls_beta > 0.2])
 c_pls_cv_t_dec = cv.lm(data = set_c_t, form.lm = TP53 ~ EXOC7 + SMARCC1 + DVL3 + HDAC3 + RWDD2A + KIDINS220 + ZGPAT + SLC25A11 + MYH6 + RPS13 + MREG + GSTA3 + DNAJA3 + ALKBH4 + NRBP1 + AGGF1 + MAT1A + RANBP10 + BAT2, m = 10) 
 mean((c_pls_cv_t_dec$cvpred-c_pls_cv_t_dec$TP53)^2) # 0.949
 
-# cv becomes larger. I finally choose c_aic_stepwise.
+# cv becomes larger. I finally choose c_aic_stepwise_t.
 
 ## LASSO
-c_lasso_t = glmnet(model.matrix(c_aic_stepwise_t)[,-1], set_c_t$TP53, alpha = 1, lambda = grid)
+c_lasso_cv_t = cv.glmnet(model.matrix(c_aic_stepwise_t)[,-1], set_c_t$TP53, lambda = grid)
+c_lasso_t = glmnet(model.matrix(c_aic_stepwise_t)[,-1], set_c_t$TP53, lambda = c_lasso_cv_t$lambda.min)
 summary(c_lasso_t)
-plot(c_lasso_t)
-c_lasso_coef_t=predict(c_lasso_t,type="coefficients",s=bestlam)
-c_lasso_coef_t
 
-save(c_aic_stepwise_t, file = "c_aic_stepwise_t.RData")
+## Comparing CV
+mean((c_aic_forward_cv_t$cvpred-c_aic_forward_cv_t$TP53)^2)
+mean((c_aic_backward_cv_t$cvpred-c_aic_backward_cv_t$TP53)^2)
+mean((c_aic_stepwise_cv_t$cvpred-c_aic_stepwise_cv_t$TP53)^2) # best
+mean((c_bic_forward_cv_t$cvpred-c_bic_forward_cv_t$TP53)^2)
+mean((c_bic_backward_cv_t$cvpred-c_bic_backward_cv_t$TP53)^2)
+mean((c_bic_stepwise_cv_t$cvpred-c_bic_stepwise_cv_t$TP53)^2)
+mean((c_pcr_cv_t$cvpred-c_pcr_cv_t$TP53)^2)
+mean((c_pls_cv_t$cvpred-c_pls_cv_t$TP53)^2)
+c_lasso_cv_t$cvm[which(c_lasso_cv_t$lambda == c_lasso_cv_t$lambda.min)] # this is larger than the original model without CV
+c_lasso_fitted_value_t = model.matrix(c_aic_stepwise_t)[,-1] %*% c_lasso_t$beta
+plot(c_lasso_fitted_value_t, c_lasso_fitted_value_t - set_c_t$TP53, main = "Residuals vs Fitted (Set C, TP53, LASSO)", xlab = "Fitted values", ylab = "Residuals")
+
+save(c_bic_backward_t, file = "c_bic_backward_t.RData")
 
 ```
 
@@ -668,6 +677,7 @@ hist(log(set_combine_scale$response), main = "Histogram of log(response) (Combin
 set_combine_log = mutate(y=log(response),.data = set_combine_scale)#new y
 set_combine_log = select(set_combine_log,-response)
 set_combine_log$y = scale(set_combine_log$y)
+save(set_combine_log,file = "../data/set_combine_log.RData")
 
 ## fitting full model
 m_combine = lm(response~., data = set_combine_scale)
@@ -828,6 +838,11 @@ combine_pls_dataframe = data.frame(unclass(combine_pls$scores))
 combine_pls_dataframe$y = set_combine_log$y
 combine_pls_cv = cv.lm(data = combine_pls_dataframe, form.lm = y ~ ., m = 10) #1.59
 
+## LASSO
+combine_lasso_cv = cv.glmnet(model.matrix(combine_aic_stepwise)[,-1], set_combine_log$y, lambda = grid)
+combine_lasso = glmnet(model.matrix(combine_aic_stepwise)[,-1], set_combine_log$y, lambda = combine_lasso_cv$lambda.min)
+summary(combine_lasso)
+
 ## Comparing CV
 mean((combine_aic_forward_cv$cvpred-combine_aic_forward_cv$y)^2)
 mean((combine_aic_backward_cv$cvpred-combine_aic_backward_cv$y)^2)
@@ -837,23 +852,21 @@ mean((combine_bic_backward_cv$cvpred-combine_bic_backward_cv$y)^2)
 mean((combine_bic_stepwise_cv$cvpred-combine_bic_stepwise_cv$y)^2)
 mean((combine_pcr_cv$cvpred-combine_pcr_cv$y)^2)
 mean((combine_pls_cv$cvpred-combine_pls_cv$y)^2)
+combine_lasso_cv$cvm[which(combine_lasso_cv$lambda == combine_lasso_cv$lambda.min)]# this is larger than the original model without CV
+combine_lasso_fitted_value = model.matrix(combine_aic_stepwise)[,-1] %*% combine_lasso$beta
+plot(combine_lasso_fitted_value, combine_lasso_fitted_value - set_combine_log$y, main = "Residuals vs Fitted (Combine, response, LASSO)", xlab = "Fitted values", ylab = "Residuals")
 
-## LASSO
-combine_lasso = glmnet(model.matrix(combine_aic_stepwise)[,-1], set_combine_log$y, alpha = 1, lambda = grid)
-summary(combine_lasso)
-plot(combine_lasso)
-combine_lasso_coef=predict(combine_lasso,type="coefficients",s=bestlam)
-combine_lasso_coef
-
-save(combine_aic_stepwise, file = "combine_aic_stepwise.RData")
+save(combine_bic_forward, file = "combine_bic_forward.RData")
 ```
 
 
 ** Set combine, TP53 **
 ```{r}
 set_combine_t = set_combine_scale[,-391]
+save(set_combine_t,file = "../data/set_combine_t.RData")
 grep(pattern = "response", x = names(set_combine_scale))
 grep(pattern = "TP53", x = names(set_combine_scale))
+
 
 ## fitting full model
 m0_combine_t = lm(TP53 ~ ., data = set_combine_t)
@@ -1032,6 +1045,13 @@ combine_pls_dataframe_t = data.frame(unclass(combine_pls_t$scores))
 combine_pls_dataframe_t$TP53 = set_combine_t$TP53
 combine_pls_cv_t = cv.lm(data = combine_pls_dataframe_t, form.lm = TP53 ~ ., m = 10) #1.25
 
+## LASSO
+combine_lasso_cv_t = cv.glmnet(model.matrix(combine_aic_forward_t)[,-1], set_combine_t$TP53, lambda = grid)
+combine_lasso_t = glmnet(model.matrix(combine_aic_stepwise_t)[,-1], set_combine_t$TP53, lambda = combine_lasso_cv_t$lambda.min)
+summary(combine_lasso_t)
+combine_lasso_fitted_value_t = model.matrix(combine_aic_forward_t)[,-1] %*% combine_lasso_t$beta
+plot(combine_lasso_fitted_value_t, combine_lasso_fitted_value_t - set_combine_t$TP53, main = "Residuals vs Fitted (Combine, TP53, LASSO)", xlab = "Fitted values", ylab = "Residuals")
+
 ## Comparing CV
 mean((combine_aic_forward_cv_t$cvpred-combine_aic_forward_cv_t$TP53)^2)
 mean((combine_aic_backward_cv_t$cvpred-combine_aic_backward_cv_t$TP53)^2)
@@ -1041,13 +1061,9 @@ mean((combine_bic_backward_cv_t$cvpred-combine_bic_backward_cv_t$TP53)^2)
 mean((combine_bic_stepwise_cv_t$cvpred-combine_bic_stepwise_cv_t$TP53)^2)
 mean((combine_pcr_cv_t$cvpred-combine_pcr_cv_t$TP53)^2)
 mean((combine_pls_cv_t$cvpred-combine_pls_cv_t$TP53)^2)
+combine_lasso_cv_t$cvm[which(combine_lasso_cv_t$lambda == combine_lasso_cv_t$lambda.min)]
 
-## LASSO
-combine_lasso_t = glmnet(model.matrix(combine_aic_forward_t)[,-1], set_combine_t$TP53, alpha = 1, lambda = grid)
-summary(combine_lasso_t)
-plot(combine_lasso_t)
-combine_lasso_coef_t=predict(combine_lasso_t,type="coefficients",s=bestlam)
-combine_lasso_coef_t
 
-save(combine_aic_forward_t, file = "combine_aic_forward_t.RData")
+save(combine_bic_backward_t, file = "combine_bic_backward_t.RData")
 ```
+

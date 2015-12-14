@@ -21,3 +21,5 @@ GMC<-function(data,nlocal=25){#nlocal is used to calculate conditional expectati
 
 	return(GMC)
 }
+
+GMC

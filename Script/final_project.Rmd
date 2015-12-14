@@ -5,6 +5,12 @@ output:
     toc: yes
 ---
 
+```{r}
+ function()
+
+```
+
+
 # 1.Set b, response
 
 ## BEST LM  
@@ -48,16 +54,37 @@ lambda2<- rnge
 lambda.set <- rbind(lambda1, lambda2)
 lambda.set <- as.data.frame(lambda.set);dim(lambda.set)
 
-findopt<-function(lambda){
-  lambda1<-lambda[1];lambda2<-lambda[2]
+# findopt<-function(lambda){
+#   lambda1<-lambda[1];lambda2<-lambda[2]
+#   fn<-function(beta){
+#   xb= as.matrix(bestmodel$model[-1]) %*% beta[-1]+beta[1]
+#   fit.n<-g1(xb)
+#   resid<-bestmodel$model$y- fit.n
+#   data<-cbind(fit.n,bestmodel$model$y)#X,Y
+#   return(-GMC(data)[2]+ lambda1*var(fit.n,resid)+lambda2*sum(abs(beta)))
+#  }
+findopt1 <- function(lambda){#with linear assumption
+    lambda1<-lambda[1];lambda2<-lambda[2]
   fn<-function(beta){
   xb= as.matrix(bestmodel$model[-1]) %*% beta[-1]+beta[1]
   fit.n<-g1(xb)
   resid<-bestmodel$model$y- fit.n
   data<-cbind(fit.n,bestmodel$model$y)#X,Y
-  return(-GMC(data)[2]+ lambda1*var(fit.n,resid)+lambda2*sum(abs(beta)))
- }
-  
+  vg<-var(fit.n)
+  return(-(vg/(vg+var(resid)))+ lambda1*var(fit.n,resid)+lambda2*sum(abs(beta)))
+  }
+  opt<-optim(par = initials, fn =fn, method = "Nelder-Mead" )
+  return(c(lambda,opt$par,-opt$value))
+}
+
+findopt2 <- function(lambda){#no linear assumption
+  fn<-function(beta){
+  xb= as.matrix(bestmodel$model[-1]) %*% beta[-1]+beta[1]
+  fit.n<-g1(xb)
+  resid<-bestmodel$model$y- fit.n
+  data<-cbind(fit.n,bestmodel$model$y)#X,Y
+  return(-GMC(data)[2]+lambda*sum(abs(beta)))
+  }
   opt<-optim(par = initials, fn =fn, method = "Nelder-Mead" )
   return(c(lambda,opt$par,-opt$value))
 }

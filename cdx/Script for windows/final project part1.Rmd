@@ -1,0 +1,1069 @@
+---
+title: "final project"
+output: html_document
+---
+
+```{r}
+rm(list = ls())
+## data preprocessing 
+set_b = read.csv("../data/Set_b.csv", header = TRUE)
+set_c = read.csv("../data/Set_c.csv", header = TRUE) # set c has TP53
+tp53 = read.csv("../data/TP53.csv", header = TRUE) 
+set_b = set_b[-which(set_b$response == 0),]
+set_c = set_c[-which(set_c$response == 0),]
+set_b_scale = data.frame(scale(set_b[,-1]))
+set_b_scale$response = set_b$response
+set_c_scale = data.frame(scale(set_c[,-1]))
+set_c_scale$response = set_c$response
+tp53 =tp53[-which(tp53$response == 0),] # delete the observation which has response equal to 0
+tp53_scale = data.frame(scale(tp53[,-1]))
+set_combine<-merge(set_b,set_c)
+set_combine_scale = data.frame(scale(set_combine[,-1]))
+set_combine_scale$response = set_combine$response
+
+```
+
+** Set b, response **
+
+```{r}
+
+## transformation
+suppressMessages(library(MASS))
+suppressMessages(library(bestglm))
+suppressMessages(library(dplyr))
+hist(set_b_scale$response, main = "Histogram of response (Set B)", xlab = "response")
+hist(log(set_b_scale$response), main = "Histogram of log(response) (Set B)", xlab = "log(response)")
+set_b_log = mutate(y=log(response),.data = set_b_scale)#new y
+set_b_log = select(set_b_log,-response)
+set_b_log$y = scale(set_b_log$y)
+save(set_b_log,file = "../data/set_b_log.RData")
+
+## fitting full model
+m_b = lm(response~., data = set_b_scale)
+layout(matrix(data = c(1,2,3,4), ncol = 2, byrow = TRUE))
+plot(m_b)
+layout(1)
+m0_b = lm(y ~ ., data = set_b_log)
+layout(matrix(data = c(1,2,3,4), ncol = 2, byrow = TRUE))
+plot(m0_b)
+layout(1)
+vif(m0_b)
+max(vif(m0_b))
+
+## model selection
+require(car)
+m1_b = lm(y ~ 1, data = set_b_log)
+n = dim(set_b_log)[1]
+
+b_aic_forward = step(object = m1_b, scope = formula(m0_b), direction="forward") # forward
+summary(b_aic_forward)
+plot(b_aic_forward, which = 4, xlab = "observations")
+outlierTest(b_aic_forward)
+which(abs(rstudent(b_aic_forward)) >= qt(0.05/2, dim(set_b_log)[1] - dim(set_b_log)[2] - 1, lower.tail = FALSE))
+
+b_aic_backward = step(m0_b, direction="backward") # backward
+summary(b_aic_backward) # largest adj-Rsquared
+plot(b_aic_backward, which = 4)
+outlierTest(b_aic_backward)
+which(abs(rstudent(b_aic_backward)) >= qt(0.05/2, dim(set_b_log)[1] - dim(set_b_log)[2] - 1, lower.tail = FALSE))
+
+b_aic_stepwise = step(object = m1_b, scope = formula(m0_b), direction="both") #stepwise
+summary(b_aic_stepwise)
+plot(b_aic_stepwise, which = 4)
+outlierTest(b_aic_stepwise)
+which(abs(rstudent(b_aic_stepwise)) >= qt(0.05/2, dim(set_b_log)[1] - dim(set_b_log)[2] - 1, lower.tail = FALSE))
+
+b_bic_forward = step(object = m1_b, scope = formula(m0_b), direction="forward", k = log(n)) # forward
+summary(b_bic_forward)
+plot(b_bic_forward, which = 4)
+outlierTest(b_bic_forward)
+which(abs(rstudent(b_bic_forward)) >= qt(0.05/2, dim(set_b_log)[1] - dim(set_b_log)[2] - 1, lower.tail = FALSE))
+
+b_bic_backward = step(m0_b, direction="backward", k = log(n)) # backward
+summary(b_bic_backward)
+plot(b_bic_backward, which = 4)
+outlierTest(b_bic_backward)
+which(abs(rstudent(b_bic_backward)) >= qt(0.05/2, dim(set_b_log)[1] - dim(set_b_log)[2] - 1, lower.tail = FALSE))
+
+b_bic_stepwise = step(object = m1_b, scope = formula(m0_b), direction="both", k = log(n)) #stepwise
+summary(b_bic_stepwise)
+plot(b_bic_stepwise, which = 4)
+outlierTest(b_bic_stepwise)
+which(abs(rstudent(b_bic_stepwise)) >= qt(0.05/2, dim(set_b_log)[1] - dim(set_b_log)[2] - 1, lower.tail = FALSE))
+
+#Mallow's cp
+library(leaps)
+library(faraway)
+b_aic_forward_cp = leaps(model.matrix(b_aic_forward)[,-1], set_b_log$y, nbest=1)
+Cpplot(b_aic_forward_cp)
+which((b_aic_forward_cp$Cp - 2*b_aic_forward_cp$size) == min(b_aic_forward_cp$Cp - 2*b_aic_forward_cp$size)) # the same as b_aic_forward
+
+# b_aic_backward_cp = leaps(model.matrix(b_aic_backward)[,-1], set_b_log$y, nbest=1) # too many variables
+
+b_aic_stepwise_cp = leaps(model.matrix(b_aic_stepwise)[,-1], set_b_log$y, nbest=1)
+Cpplot(b_aic_stepwise_cp)
+which((b_aic_stepwise_cp$Cp - 2*b_aic_stepwise_cp$size) == min(b_aic_stepwise_cp$Cp - 2*b_aic_stepwise_cp$size)) # the same as b_aic_stepwise
+
+b_bic_forward_cp = leaps(model.matrix(b_bic_forward)[,-1], set_b_log$y, nbest=1)
+Cpplot(b_bic_forward_cp)
+which((b_bic_forward_cp$Cp - 2*b_bic_forward_cp$size) == min(b_bic_forward_cp$Cp - 2*b_bic_forward_cp$size)) # same
+
+b_bic_backward_cp = leaps(model.matrix(b_bic_backward)[,-1], set_b_log$y, nbest=1)
+Cpplot(b_bic_backward_cp)
+which((b_bic_backward_cp$Cp - 2*b_bic_backward_cp$size) == min(b_bic_backward_cp$Cp - 2*b_bic_backward_cp$size)) # same
+
+b_bic_stepwise_cp = leaps(model.matrix(b_bic_stepwise)[,-1], set_b_log$y, nbest=1)
+Cpplot(b_bic_stepwise_cp) 
+which((b_bic_stepwise_cp$Cp - 2*b_bic_stepwise_cp$size) == min(b_bic_stepwise_cp$Cp - 2*b_bic_stepwise_cp$size)) # same
+
+## Cross Validation
+require(DAAG)
+
+b_aic_forward_cv = cv.lm(data = set_b_log, form.lm = y ~ BCL7C + ATG12 + HOXA9 + PYY + FNDC4 + PROM1 + 
+    SPINK1 + NPAS3 + BRWD2 + GPR64 + MRPL49 + AAK1 + CIDEA + 
+    OCLN + COL4A4 + GTF3C4 + DYNC1LI1 + F2R + PMM2 + FPGS + KREMEN2 + 
+    ZNF492 + SCARF1 + MATK + AMBP + KIAA1199, m = 10) #0.936
+
+b_aic_backward_cv = cv.lm(data = set_b_log, form.lm = y ~ RAD23B + FMO1 + PABPC3 + GOLPH3L + EDG5 + ASCL2 + 
+    RPP21 + NEK11 + HBXIP + HOXC10 + RPGRIP1 + OCLN + MGLL + 
+    NPC2 + EVL + MRPL49 + KIAA1199 + HNRPA3 + GPC4 + FPGS + CIDEA + 
+    ULBP1 + GUCY1B3 + TOMM40 + ZNF492 + MATK + C16orf57 + ZBED2 + 
+    BCL7C + PRKCQ + C5orf13 + KREMEN2 + H2AFY + RFK + TAF9B + 
+    PALM + GSTK1 + PYY + AAK1 + HSPA14 + C11orf10 + ATP7A + TGFBR3 + 
+    SFRS16 + BRWD2 + PGRMC2 + EIF4E + FNDC4 + SCNN1B + SPINK1 + 
+    YARS + FADS2 + GPR143 + GTF3C4 + PMM2 + NPAS3 + HOXA9 + KBTBD10 + 
+    IDH2, m =10) #0.936
+
+b_aic_stepwise_cv = cv.lm(data = set_b_log, form.lm = y ~ BCL7C + HOXA9 + PYY + FNDC4 + PROM1 + SPINK1 +     NPAS3 + BRWD2 + GPR64 + MRPL49 + AAK1 + CIDEA + OCLN + COL4A4 + 
+    KREMEN2 + PMM2 + GTF3C4 + FPGS + F2R + SCARF1 + ZNF492 + 
+    AMBP + MATK + KIAA1199, m = 10) #0.932
+ 
+b_bic_forward_cv = cv.lm(data = set_b_log, form.lm = y ~ BCL7C + ATG12, m = 10) #0.983
+
+b_bic_backward_cv = cv.lm(data = set_b_log, form.lm = y ~ BCL7C + BRWD2 + NPAS3, m = 10) #0.98
+
+b_bic_stepwise_cv = cv.lm(data = set_b_log, form.lm = y ~ BCL7C + ATG12, m = 10) #0.983
+
+## PCR
+b_princomp = princomp(set_b_log[,-201])
+summary(b_princomp)
+loadings(b_princomp)
+plot(b_princomp, main = "Princomp (Set B)")
+
+require(pls)
+b_pca = pcr(y ~ ., ncomp = 30,scale = TRUE, data = set_b_log, validation = "CV")
+summary(b_pca)
+b_pcr = lm(y ~ b_pca$scores, set_b_log)
+summary(b_pcr)
+b_pca_dataframe = data.frame(unclass(b_pca$scores))
+b_pca_dataframe$y = set_b_log$y
+b_pcr_cv = cv.lm(data = b_pca_dataframe, form.lm = y ~ ., m = 10) #1.13
+
+## PLS
+b_pls = plsr(y ~ .,ncomp = 30,scale = TRUE, data = set_b_log, validation = "CV", method="oscorespls")
+summary(b_pls)
+drop(coef(b_pls))
+
+b_pls_lm = lm(y~b_pls$scores,set_b_log)
+summary(b_pls_lm)
+
+b_pls_dataframe = data.frame(unclass(b_pls$scores))
+b_pls_dataframe$y = set_b_log$y
+b_pls_cv = cv.lm(data = b_pls_dataframe, form.lm = y ~ ., m = 10) #1.01
+
+## LASSO
+require(glmnet)
+grid=10^seq(10,-10,length=100)
+b_lasso_cv = cv.glmnet(model.matrix(b_aic_stepwise)[,-1], set_b_log$y, lambda = grid)
+b_lasso = glmnet(model.matrix(b_aic_stepwise)[,-1], set_b_log$y, lambda = b_lasso_cv$lambda.min)
+summary(b_lasso)
+
+## Comparing CV
+mean((b_aic_forward_cv$cvpred-b_aic_forward_cv$y)^2) 
+mean((b_aic_backward_cv$cvpred-b_aic_backward_cv$y)^2)
+mean((b_aic_stepwise_cv$cvpred-b_aic_stepwise_cv$y)^2) # best 
+mean((b_bic_forward_cv$cvpred-b_bic_forward_cv$y)^2)
+mean((b_bic_backward_cv$cvpred-b_bic_forward_cv$y)^2)
+mean((b_bic_stepwise_cv$cvpred-b_bic_stepwise_cv$y)^2) 
+mean((b_pcr_cv$cvpred-b_pcr_cv$y)^2)
+mean((b_pls_cv$cvpred-b_pls_cv$y)^2)
+b_lasso_cv$cvm[which(b_lasso_cv$lambda == b_lasso_cv$lambda.min)]
+b_lasso_fitted_value = model.matrix(b_aic_stepwise)[,-1] %*% b_lasso$beta
+plot(b_lasso_fitted_value, b_lasso_fitted_value - set_b_log$y, main = "Residuals vs Fitted (Set B, response, LASSO)", xlab = "Fitted values", ylab = "Residuals")
+vif(b_lasso)
+
+save(b_bic_backward, file = "b_bic_backward.RData")
+```
+
+** Set C, response **
+```{r}
+## transformation
+hist(set_c_scale$response, main = "Histogram of response (Set C)", xlab = "response")
+hist(log(set_c_scale$response), main = "Histogram of log(response) (Set C)", xlab = "log(response)")
+set_c_log = mutate(y=log(response),.data = set_c_scale)#new y
+set_c_log = select(set_c_log,-response)
+set_c_log$y = scale(set_c_log$y)
+save(set_c_log,file = "../data/set_c_log.RData")
+
+## fitting full model
+m_c = lm(response~., data = set_c_scale)
+layout(matrix(data = c(1,2,3,4), ncol = 2, byrow = TRUE))
+plot(m_c)
+layout(1)
+m0_c = lm(y ~ ., data = set_c_log)
+layout(matrix(data = c(1,2,3,4), ncol = 2, byrow = TRUE))
+plot(m0_c)
+layout(1)
+vif(m0_c)
+max(vif(m0_c))
+
+## model selection
+m1_c = lm(y ~ 1, data = set_c_log)
+n = dim(set_c_log)[1]
+
+c_aic_forward = step(object = m1_c, scope = formula(m0_c), direction="forward") # forward
+summary(c_aic_forward)
+plot(c_aic_forward, which = 4)
+outlierTest(c_aic_forward)
+which(abs(rstudent(c_aic_forward)) >= qt(0.05/2, dim(set_c_log)[1] - dim(set_c_log)[2] - 1, lower.tail = FALSE))
+
+c_aic_backward = step(m0_c, direction="backward") # backward
+summary(c_aic_backward) # largest adj-Rsquared 0.164
+plot(c_aic_backward, which = 4)
+outlierTest(c_aic_backward)
+which(abs(rstudent(c_aic_backward)) >= qt(0.05/2, dim(set_c_log)[1] - dim(set_c_log)[2] - 1, lower.tail = FALSE))
+
+c_aic_stepwise = step(object = m1_c, scope = formula(m0_c), direction="both") #stepwise
+summary(c_aic_stepwise)
+plot(c_aic_stepwise, which = 4)
+outlierTest(c_aic_stepwise)
+which(abs(rstudent(c_aic_stepwise)) >= qt(0.05/2, dim(set_c_log)[1] - dim(set_c_log)[2] - 1, lower.tail = FALSE))
+
+c_bic_forward = step(object = m1_c, scope = formula(m0_c), direction="forward", k = log(n)) # forward
+summary(c_bic_forward)
+plot(c_bic_forward, which = 4)
+outlierTest(c_bic_forward)
+which(abs(rstudent(c_bic_forward)) >= qt(0.05/2, dim(set_c_log)[1] - dim(set_c_log)[2] - 1, lower.tail = FALSE))
+
+c_bic_backward = step(m0_c, direction="backward", k = log(n)) # backward
+summary(c_bic_backward)
+plot(c_bic_backward, which = 4)
+outlierTest(c_bic_backward)
+which(abs(rstudent(c_bic_backward)) >= qt(0.05/2, dim(set_c_log)[1] - dim(set_c_log)[2] - 1, lower.tail = FALSE))
+
+c_bic_stepwise = step(object = m1_c, scope = formula(m0_c), direction="both", k = log(n)) #stepwise
+summary(c_bic_stepwise)
+plot(c_bic_stepwise, which = 4)
+outlierTest(c_bic_stepwise)
+which(abs(rstudent(c_bic_stepwise)) >= qt(0.05/2, dim(set_c_log)[1] - dim(set_c_log)[2] - 1, lower.tail = FALSE))
+
+#Mallow's cp
+c_aic_forward_cp = leaps(model.matrix(c_aic_forward)[,-1], set_c_log$y, nbest=1)
+Cpplot(c_aic_forward_cp)
+which((c_aic_forward_cp$Cp - 2*c_aic_forward_cp$size) == min(c_aic_forward_cp$Cp - 2*c_aic_forward_cp$size)) # same
+
+# c_aic_backward_cp = leaps(model.matrix(c_aic_backward)[,-1], set_c_log$y, nbest=1) # too many variables
+
+c_aic_stepwise_cp = leaps(model.matrix(c_aic_stepwise)[,-1], set_c_log$y, nbest=1)
+Cpplot(c_aic_stepwise_cp)
+which((c_aic_stepwise_cp$Cp - 2*c_aic_stepwise_cp$size) == min(c_aic_stepwise_cp$Cp - 2*c_aic_stepwise_cp$size)) #same
+
+# For bic, there is only one variable in the model.  There is no need to check Mallow's cp.
+
+## Cross Validation
+c_aic_forward_cv = cv.lm(data = set_c_log, form.lm = y ~ KIR3DX1 + GALNT14 + CYP2W1 + FNDC4 + CACNA2D2 +     PYY + FLG + PLCD1 + ABCD3 + C1orf69 + ALKBH4 + SOSTDC1 + 
+    FLJ20309 + SNAPC2 + PCDHA9 + SMC5 + PLXNB1 + VDR + SMARCC1 + 
+    ANP32E + SLC35C2 + PLCG1 + PITX1 + ING3 + tcag7.1314 + SPINK1 + 
+    ZNF250 + NXT2 + AIFM1, m = 10) #0.922
+
+c_aic_backward_cv = cv.lm(data = set_c_log, form.lm = y ~ TP53 + PRDM2 + SYNGR3 + FLG + SMARCC1 + PCDHA9 + 
+    LRRC15 + NELL2 + SHROOM2 + RPUSD2 + PLCG1 + CEL + SEPW1 + 
+    PLEKHF2 + APITD1 + RPS13 + GSTA3 + SMC5 + GALNT14 + SNAPC2 + 
+    C9orf167 + RPLP2 + MRPL24 + MRPL44 + C20orf43 + PYY + ALKBH4 + 
+    POLR3B + SPINK1 + PLCD1 + KIR3DX1 + C2 + ASPN + C1orf69 + 
+    BUB1 + VDR + FNDC4 + NXT2 + LAPTM4B + DKFZP566E164 + CCND1 + 
+    DLGAP2 + PLXNB1 + tcag7.1314 + TRIM15 + SLC35C2, m =10) #0.937
+
+c_aic_stepwise_cv = cv.lm(data = set_c_log, form.lm = y ~ KIR3DX1 + GALNT14 + CYP2W1 + FNDC4 + CACNA2D2 + 
+    PYY + FLG + PLCD1 + ABCD3 + C1orf69 + ALKBH4 + SOSTDC1 + 
+    SNAPC2 + PCDHA9 + SMC5 + PLXNB1 + VDR + SMARCC1 + ANP32E + 
+    SLC35C2 + PLCG1 + PITX1 + ING3 + tcag7.1314 + SPINK1 + ZNF250 + 
+    NXT2 + AIFM1 + MRPL44 + RPS13 + DLGAP2, m = 10) #0.922
+
+c_bic_forward_cv = cv.lm(data = set_c_log, form.lm = y ~ KIR3DX1, m = 10) # 0.991
+#for bic, three methods have the same outcome.
+
+## PCR
+c_princomp = princomp(set_c_log[,-201])
+summary(c_princomp)
+loadings(c_princomp)
+plot(c_princomp, main = "Princomp (Set C)")
+
+c_pca = pcr(y ~ ., ncomp = 30,scale = TRUE, data = set_c_log, validation = "CV")
+summary(c_pca)
+c_pcr = lm(y ~ c_pca$scores, set_c_log)
+summary(c_pcr)
+c_pca_dataframe = data.frame(unclass(c_pca$scores))
+c_pca_dataframe$y = set_c_log$y
+c_pcr_cv = cv.lm(data = c_pca_dataframe, form.lm = y ~ ., m = 10) #1.14
+
+## PLS
+c_pls = plsr(y ~ .,ncomp = 30,scale = TRUE, data = set_c_log, validation = "CV", method="oscorespls")
+summary(c_pls)
+drop(coef(c_pls))
+
+c_pls_lm = lm(y~c_pls$scores,set_c_log)
+summary(c_pls_lm)
+
+c_pls_dataframe = data.frame(unclass(c_pls$scores))
+c_pls_dataframe$y = set_c_log$y
+c_pls_cv = cv.lm(data = c_pls_dataframe, form.lm = y ~ ., m = 10) #0.957
+
+## LASSO
+c_lasso_cv = cv.glmnet(model.matrix(c_aic_stepwise)[,-1], set_c_log$y, lambda = grid)
+c_lasso = glmnet(model.matrix(c_aic_stepwise)[,-1], set_c_log$y, lambda = c_lasso_cv$lambda.min)
+summary(c_lasso)
+
+## Comparing CV
+mean((c_aic_forward_cv$cvpred-c_aic_forward_cv$y)^2)
+mean((c_aic_backward_cv$cvpred-c_aic_backward_cv$y)^2)
+mean((c_aic_stepwise_cv$cvpred-c_aic_stepwise_cv$y)^2) # best
+mean((c_bic_forward_cv$cvpred-c_bic_forward_cv$y)^2)
+mean((c_pcr_cv$cvpred-c_pcr_cv$y)^2)
+mean((c_pls_cv$cvpred-c_pls_cv$y)^2)
+c_lasso_cv$cvm[which(c_lasso_cv$lambda == c_lasso_cv$lambda.min)]
+
+# c_aic_forward and c_aic_stepwise have the same CV.  However, c_aic_stepwise has larger adj R-squared.(0.137)
+
+c_lasso_fitted_value = model.matrix(c_aic_stepwise)[,-1] %*% c_lasso$beta
+plot(c_lasso_fitted_value, c_lasso_fitted_value - set_c_log$y, main = "Residuals vs Fitted (Set C, response, LASSO)", xlab = "Fitted values", ylab = "Residuals")
+
+save(c_bic_forward, file = "c_bic_forward.RData")
+```
+
+
+** Set b, TP53 **
+
+```{r}
+set_b_t = set_b_log[,-201]
+names(tp53_scale) = "TP53"
+set_b_t$TP53 = tp53_scale$TP53
+save(set_b_t,file = "../data/set_b_t.RData")
+
+## fitting full model
+m0_b_t = lm(TP53 ~ ., data = set_b_t)
+layout(matrix(data = c(1,2,3,4), ncol = 2, byrow = TRUE))
+plot(m0_b_t)
+layout(1)
+vif(m0_b_t)
+max(vif(m0_b_t))
+
+## model selection (BIC: favoring simpler models)
+m1_b_t = lm(TP53 ~ 1, data = set_b_t)
+n = dim(set_b_t)[1]
+
+b_aic_forward_t = step(object = m1_b_t, scope = formula(m0_b_t), direction="forward") # forward
+summary(b_aic_forward_t) # 0.388
+plot(b_aic_forward_t, which = 4)
+outlierTest(b_aic_forward_t)
+which(abs(rstudent(b_aic_forward_t)) >= qt(0.05/2, dim(set_b_t)[1] - dim(set_b_t)[2] - 1, lower.tail = FALSE))
+
+b_aic_backward_t = step(m0_b_t, direction="backward") # backward
+summary(b_aic_backward_t) # 0.402
+plot(b_aic_backward_t, which = 4)
+outlierTest(b_aic_backward_t)
+which(abs(rstudent(b_aic_backward_t)) >= qt(0.05/2, dim(set_b_t)[1] - dim(set_b_t)[2] - 1, lower.tail = FALSE))
+
+b_aic_stepwise_t = step(object = m1_b_t, scope = formula(m0_b_t), direction="both") #stepwise
+summary(b_aic_stepwise_t) # 0.393
+plot(b_aic_stepwise_t, which = 4)
+outlierTest(b_aic_stepwise_t)
+which(abs(rstudent(b_aic_stepwise_t)) >= qt(0.05/2, dim(set_b_t)[1] - dim(set_b_t)[2] - 1, lower.tail = FALSE))
+
+
+b_bic_forward_t = step(object = m1_b_t, scope = formula(m0_b_t), direction="forward", k = log(n)) # forward
+summary(b_bic_forward_t) # 0.249
+plot(b_bic_forward_t, which = 4)
+outlierTest(b_bic_forward_t)
+which(abs(rstudent(b_bic_forward_t)) >= qt(0.05/2, dim(set_b_t)[1] - dim(set_b_t)[2] - 1, lower.tail = FALSE))
+
+b_bic_backward_t = step(m0_b_t, direction="backward", k = log(n)) # backward
+summary(b_bic_backward_t) # 0.284
+plot(b_bic_backward_t, which = 4)
+outlierTest(b_bic_backward_t)
+which(abs(rstudent(b_bic_backward_t)) >= qt(0.05/2, dim(set_b_t)[1] - dim(set_b_t)[2] - 1, lower.tail = FALSE))
+
+b_bic_stepwise_t = step(object = m1_b_t, scope = formula(m0_b_t), direction="both", k = log(n)) #stepwise
+summary(b_bic_stepwise_t) # 0.243
+plot(b_bic_stepwise_t, which = 4)
+outlierTest(b_bic_stepwise_t)
+which(abs(rstudent(b_bic_stepwise_t)) >= qt(0.05/2, dim(set_b_t)[1] - dim(set_b_t)[2] - 1, lower.tail = FALSE))
+
+#Mallow's cp
+# b_aic_forward_cp_t = leaps(model.matrix(b_aic_forward_t)[,-1], set_b_t$TP53, nbest=1) # too many variables
+
+# b_aic_backward_cp_t = leaps(model.matrix(b_aic_backward_t)[,-1], set_b_t$TP53, nbest=1) # too many variables
+
+# b_aic_stepwise_cp_t = leaps(model.matrix(b_aic_stepwise_t)[,-1], set_b_t$TP53, nbest=1) # too many variables
+
+b_bic_forward_cp_t = leaps(model.matrix(b_bic_forward_t)[,-1], set_b_t$TP53, nbest=1)
+Cpplot(b_bic_forward_cp_t) 
+which((b_bic_forward_cp_t$Cp - 2*b_bic_forward_cp_t$size) == min(b_bic_forward_cp_t$Cp - 2*b_bic_forward_cp_t$size))# same
+
+b_bic_backward_cp_t = leaps(model.matrix(b_bic_backward_t)[,-1], set_b_t$TP53, nbest=1)
+Cpplot(b_bic_backward_cp_t) # same
+
+b_bic_stepwise_cp_t = leaps(model.matrix(b_bic_stepwise_t)[,-1], set_b_t$TP53, nbest=1)
+Cpplot(b_bic_stepwise_cp_t) # same
+
+## Cross Validation
+b_aic_forward_cv_t = cv.lm(data = set_b_t, form.lm = TP53 ~ PFN1 + C6orf130 + HBXIP + NDUFB8 + ZBED2 + 
+    ZNF197 + ASCL2 + MYO7B + TMEM38B + RABL5 + FAM128A + LITAF + 
+    SLC6A8 + C1orf54 + C16orf57 + THRB + G0S2 + KLF10 + DNAJB5 + 
+    FPGS + HOXC10 + HOXA9 + SEMA3B + ARHGEF12 + TAF4 + ZC3H13 + 
+    AURKB + NOL1 + RBM12B + RPGRIP1 + PYY + MATK + KIAA0586 + 
+    PPM1H + HNRNPU + AMBP + OR2F2 + NADSYN1 + GM2A + KREMEN2 + 
+    KLHDC3 + NAP1L4 + DYNC1LI1 + ENO1 + SLC19A1 + RRP1 + S100A4 + 
+    GUCY1B3 + MAD2L1 + PALM + OCLN + RFK + CADM3 + PDCD1LG2 + 
+    SCNN1B, m = 10) # 0.701
+
+b_aic_backward_cv_t = cv.lm(data = set_b_t, form.lm = TP53 ~ SLC6A8 + ATM + SEMA3B + AURKB + ASCL2 + ISG20L1 + 
+    RPP21 + SIVA1 + DNAJB5 + HBXIP + ARHGEF12 + HOXC10 + OR51E2 + 
+    AMBP + TAF4 + RPGRIP1 + CANT1 + OCLN + RRP1 + ZC3H13 + TTLL12 + 
+    KIAA1199 + SLC19A1 + FPGS + GUCY1B3 + TTK + RABL5 + HPGD + 
+    MATK + C16orf57 + CINP + KLF10 + LOC374395 + PDCD1LG2 + C5orf13 + 
+    KREMEN2 + H2AFY + RFK + PALM + NDUFB8 + ENO1 + KLHDC3 + PYY + 
+    G0S2 + MYO7B + FAM128A + SCARF1 + ATP7A + NOL1 + C5orf5 + 
+    SDCCAG3 + PFN1 + LMO3 + S100A4 + C6orf130 + HNRNPU + KIAA0586 + 
+    DYNC1LI1 + IKBKB + TMEM38B + MAD2L1 + GM2A + KIAA1704 + C1orf54 + 
+    SLC24A3 + THRB + HOXA9 + IDH2 + SYNJ2 + RBM12B, m =10) # 0.723
+
+b_aic_stepwise_cv_t = cv.lm(data = set_b_t, form.lm = TP53 ~ PFN1 + C6orf130 + HBXIP + NDUFB8 + ZBED2 + 
+    ZNF197 + ASCL2 + MYO7B + TMEM38B + RABL5 + FAM128A + LITAF + 
+    SLC6A8 + C1orf54 + C16orf57 + THRB + G0S2 + KLF10 + DNAJB5 + 
+    FPGS + HOXC10 + HOXA9 + SEMA3B + ARHGEF12 + TAF4 + ZC3H13 + 
+    AURKB + NOL1 + RBM12B + RPGRIP1 + PYY + MATK + KIAA0586 + 
+    PPM1H + HNRNPU + AMBP + NADSYN1 + GM2A + KREMEN2 + KLHDC3 + 
+    NAP1L4 + DYNC1LI1 + ENO1 + SLC19A1 + RRP1 + S100A4 + GUCY1B3 + 
+    MAD2L1 + PALM + P18SRP + ATP7A + IKBKB + TNKS + RFK + PDCD1LG2 + 
+    HPGD + LOC374395, m = 10) # 0.702
+
+b_bic_forward_cv_t = cv.lm(data = set_b_t, form.lm = TP53 ~ PFN1 + C6orf130 + HBXIP + NDUFB8 + ZBED2 + 
+    ZNF197 + ASCL2 + MYO7B + TMEM38B + RABL5 + FAM128A + LITAF + 
+    SLC6A8 + C1orf54 + C16orf57, m = 10) # 0.769
+
+b_bic_backward_cv_t = cv.lm(data = set_b_t, form.lm = TP53 ~ SLC6A8 + AURKB + ASCL2 + DNAJB5 + HOXC10 + 
+    AMBP + TAF4 + OCLN + RRP1 + ZC3H13 + SLC19A1 + FPGS + RABL5 + 
+    C16orf57 + KLF10 + NDUFB8 + G0S2 + MYO7B + FAM128A + C6orf130 + 
+    TMEM38B + MAD2L1 + GM2A + THRB + RBM12B, m = 10) # 0.759
+
+b_bic_stepwise_cv_t = cv.lm(data = set_b_t, form.lm = TP53 ~ PFN1 + C6orf130 + HBXIP + NDUFB8 + ZBED2 + 
+    ZNF197 + ASCL2 + MYO7B + TMEM38B + FAM128A + LITAF + SLC6A8 + 
+    C1orf54 + C16orf57, m = 10) # 0.774
+
+## PCR
+b_princomp_t = princomp(set_b_t[,-201])
+summary(b_princomp_t)
+loadings(b_princomp_t)
+plot(b_princomp_t, main = "Princomp (Set B)")
+
+b_pca_t = pcr(TP53 ~ ., ncomp = 30,scale = TRUE, data = set_b_t, validation = "CV")
+summary(b_pca_t)
+b_pcr_t = lm(TP53 ~ b_pca_t$scores, set_b_t)
+summary(b_pcr_t)
+b_pca_dataframe_t = data.frame(unclass(b_pca_t$scores))
+b_pca_dataframe_t$TP53 = set_b_t$TP53
+b_pcr_cv_t = cv.lm(data = b_pca_dataframe_t, form.lm = TP53 ~ ., m = 10) #1.08
+
+## PLS
+b_pls_t = plsr(TP53 ~ .,ncomp = 30,scale = TRUE, data = set_b_t, validation = "CV", method="oscorespls")
+summary(b_pls_t)
+drop(coef(b_pls_t))
+
+b_pls_lm_t = lm(TP53 ~ b_pls_t$scores,set_b_t)
+summary(b_pls_lm_t)
+
+b_pls_dataframe_t = data.frame(unclass(b_pls_t$scores))
+b_pls_dataframe_t$TP53 = set_b_t$TP53
+b_pls_cv_t = cv.lm(data = b_pls_dataframe_t, form.lm = TP53 ~ ., m = 10) #0.763
+
+## LASSO
+b_lasso_cv_t = cv.glmnet(model.matrix(b_aic_forward_t)[,-1], set_b_t$TP53, lambda = grid)
+b_lasso_t = glmnet(model.matrix(b_aic_forward_t)[,-1], set_b_t$TP53, lambda = b_lasso_cv_t$lambda.min)
+summary(b_lasso_t)
+
+## Comparing CV
+mean((b_aic_forward_cv_t$cvpred-b_aic_forward_cv_t$TP53)^2) # best
+mean((b_aic_backward_cv_t$cvpred-b_aic_backward_cv_t$TP53)^2)
+mean((b_aic_stepwise_cv_t$cvpred-b_aic_stepwise_cv_t$TP53)^2)
+mean((b_bic_forward_cv_t$cvpred-b_bic_forward_cv_t$TP53)^2)
+mean((b_bic_backward_cv_t$cvpred-b_bic_backward_cv_t$TP53)^2)
+mean((b_bic_stepwise_cv_t$cvpred-b_bic_stepwise_cv_t$TP53)^2)
+mean((b_pcr_cv_t$cvpred-b_pcr_cv_t$TP53)^2)
+mean((b_pls_cv_t$cvpred-b_pls_cv_t$TP53)^2)
+b_lasso_cv_t$cvm[which(b_lasso_cv_t$lambda == b_lasso_cv_t$lambda.min)]
+b_lasso_fitted_value_t = model.matrix(b_aic_forward_t)[,-1] %*% b_lasso_t$beta
+plot(b_lasso_fitted_value_t, b_lasso_fitted_value_t - set_b_t$TP53, main = "Residuals vs Fitted (Set B, TP53, LASSO)", xlab = "Fitted values", ylab = "Residuals")
+
+save(b_bic_backward_t,file = "b_bic_backward_t.RData")
+```
+
+
+** Set C, TP53 **
+```{r}
+set_c_t = set_c_scale[,-201]
+save(set_c_t,file = "../data/set_c_t.RData")
+## fitting full model
+m0_c_t = lm(TP53 ~ ., data = set_c_t)
+layout(matrix(data = c(1,2,3,4), ncol = 2, byrow = TRUE))
+plot(m0_c_t)
+layout(1)
+vif(m0_c_t)
+
+## model selection
+m1_c_t = lm(TP53 ~ 1, data = set_c_t)
+n = dim(set_c_t)[1]
+
+c_aic_forward_t = step(object = m1_c_t, scope = formula(m0_c_t), direction="forward") # forward
+summary(c_aic_forward_t) # 0.292
+plot(c_aic_forward_t, which = 4)
+outlierTest(c_aic_forward_t)
+which(abs(rstudent(c_aic_forward_t)) >= qt(0.05/2, dim(set_c_t)[1] - dim(set_c_t)[2] - 1, lower.tail = FALSE))
+
+c_aic_backward_t = step(m0_c_t, direction="backward") # backward
+summary(c_aic_backward_t) # 0.297
+plot(c_aic_backward_t, which = 4)
+outlierTest(c_aic_backward_t)
+which(abs(rstudent(c_aic_backward_t)) >= qt(0.05/2, dim(set_c_t)[1] - dim(set_c_t)[2] - 1, lower.tail = FALSE))
+
+c_aic_stepwise_t = step(object = m1_c_t, scope = formula(m0_c_t), direction="both") #stepwise
+summary(c_aic_stepwise_t) # 0.284
+plot(c_aic_stepwise_t, which = 4)
+outlierTest(c_aic_stepwise_t)
+which(abs(rstudent(c_aic_stepwise_t)) >= qt(0.05/2, dim(set_c_t)[1] - dim(set_c_t)[2] - 1, lower.tail = FALSE))
+
+
+
+c_bic_forward_t = step(object = m1_c_t, scope = formula(m0_c_t), direction="forward", k = log(n)) # forward
+summary(c_bic_forward_t) # 0.124
+plot(c_bic_forward_t, which = 4)
+outlierTest(c_bic_forward_t)
+which(abs(rstudent(c_bic_forward_t)) >= qt(0.05/2, dim(set_c_t)[1] - dim(set_c_t)[2] - 1, lower.tail = FALSE))
+
+c_bic_backward_t = step(m0_c_t, direction="backward", k = log(n)) # backward
+summary(c_bic_backward_t) # 0.199
+plot(c_bic_backward_t, which = 4)
+outlierTest(c_bic_backward_t)
+which(abs(rstudent(c_bic_backward_t)) >= qt(0.05/2, dim(set_c_t)[1] - dim(set_c_t)[2] - 1, lower.tail = FALSE))
+
+c_bic_stepwise_t = step(object = m1_c_t, scope = formula(m0_c_t), direction="both", k = log(n)) #stepwise
+summary(c_bic_stepwise_t) # 0.124
+plot(c_bic_stepwise_t, which = 4)
+outlierTest(c_bic_stepwise_t)
+which(abs(rstudent(c_bic_stepwise_t)) >= qt(0.05/2, dim(set_c_t)[1] - dim(set_c_t)[2] - 1, lower.tail = FALSE))
+
+#Mallow's cp
+# c_aic_forward_cp_t = leaps(model.matrix(c_aic_forward_t)[,-1], set_c_t$TP53, nbest=1) # too many variables
+
+# c_aic_backward_cp_t = leaps(model.matrix(c_aic_backward_t)[,-1], set_c_t$TP53, nbest=1) # too many variables
+
+# c_aic_stepwise_cp_t = leaps(model.matrix(c_aic_stepwise_t)[,-1], set_c_t$TP53, nbest=1) # too many variables
+
+c_bic_forward_cp_t = leaps(model.matrix(c_bic_forward_t)[,-1], set_c_t$TP53, nbest=1)
+Cpplot(c_bic_forward_cp_t) # same 
+
+c_bic_backward_cp_t = leaps(model.matrix(c_bic_backward_t)[,-1], set_c_t$TP53, nbest=1)
+Cpplot(c_bic_backward_cp_t) # same
+
+c_bic_stepwise_cp_t = leaps(model.matrix(c_bic_stepwise_t)[,-1], set_c_t$TP53, nbest=1)
+Cpplot(c_bic_stepwise_cp_t) # same
+
+## Cross Validation
+c_aic_forward_cv_t = cv.lm(data = set_c_t, form.lm = TP53 ~ YIPF3 + RRP12 + BRE + GK + SCML1 + DVL3 + 
+    C13orf18 + PHF10 + MLF1 + THAP10 + SOCS6 + OXCT1 + SLC25A11 + 
+    PLCD1 + FASTK + ORM1 + CXCL14 + PYY + CST3 + RANBP10 + MAT1A + 
+    SNX17 + NXT2 + CACNA2D2 + KIAA1012 + KIDINS220 + TARBP2 + 
+    PLEKHF2 + PEX13 + AKR1D1 + tcag7.1314 + RPS13 + ALKBH4 + 
+    RPLP2 + SECISBP2 + MLPH + SCLY + CEL + ATF7IP + RBM16 + BAT2 + 
+    DR1 + SPINK1 + IL12RB1 + PLCG1 + PITX1 + PIGC + SETD3, m = 10) # 0.778
+
+c_aic_backward_cv_t = cv.lm(data = set_c_t, form.lm = TP53 ~ THAP10 + EXOC7 + KCNMB2 + DVL3 + FBLN5 + 
+    CIR + ORM1 + HDAC3 + SCML1 + PLCG1 + RWDD2A + KIDINS220 + 
+    SNX17 + CEL + PLEKHF2 + SLC25A11 + APITD1 + RPS13 + MOSC1 + 
+    ATF7IP + MLPH + DNAJA3 + CXCL14 + NUP85 + SOCS6 + ABCA2 + 
+    OXCT1 + KIR2DL4 + PYY + NRBP1 + C13orf18 + SLC16A4 + CST3 + 
+    MAT1A + TBC1D12 + PIGC + KIAA1012 + GK + RANBP10 + FASTK + 
+    SCLY + TK1 + SLC1A6 + NXT2 + PEX13 + DKFZP566E164 + PHF10 + 
+    IQCC + AKR1D1 + tcag7.1314 + CRYBA2 + SLC46A3 + DR1 + CACNA2D2, m =10) #0.801
+
+c_aic_stepwise_cv_t = cv.lm(data = set_c_t, form.lm = TP53 ~ RRP12 + GK + SCML1 + DVL3 + C13orf18 + PHF10 + 
+    MLF1 + THAP10 + SOCS6 + OXCT1 + SLC25A11 + FASTK + ORM1 + 
+    CXCL14 + PYY + CST3 + RANBP10 + MAT1A + SNX17 + NXT2 + CACNA2D2 + 
+    KIAA1012 + KIDINS220 + TARBP2 + PLEKHF2 + PEX13 + AKR1D1 + 
+    RPS13 + ALKBH4 + RPLP2 + SECISBP2 + ATF7IP + SETD3 + RBM16 + 
+    BAT2 + PIGC + MAN2A2 + MLPH + SCLY, m = 10) #0.771
+
+c_bic_forward_cv_t = cv.lm(data = set_c_t, form.lm = TP53 ~ YIPF3 + RRP12 + BRE + GK + SCML1 + DVL3, m = 10) # 0.888
+
+c_bic_backward_cv_t = cv.lm(data = set_c_t, form.lm = TP53 ~ THAP10 + SCML1 + KIDINS220 + SLC25A11 + SOCS6 + 
+    OXCT1 + PYY + C13orf18 + CST3 + MAT1A + GK + RANBP10 + PEX13 + 
+    AKR1D1 + tcag7.1314 + CACNA2D2, m = 10) # 0.831
+
+c_bic_stepwise_cv_t = cv.lm(data = set_c_t, form.lm = TP53 ~ YIPF3 + RRP12 + BRE + GK + SCML1 + DVL3, m = 10) # 0.888
+
+## PCR
+grep(pattern = "TP53", x = names(set_c_log))
+c_princomp_t = princomp(set_c_t[,-4])
+summary(c_princomp_t)
+loadings(c_princomp_t)
+plot(c_princomp_t, main = "Princomp (Set C)")
+
+c_pca_t = pcr(TP53 ~ ., ncomp = 30,scale = TRUE, data = set_c_t, validation = "CV")
+summary(c_pca_t)
+c_pcr_t = lm(TP53 ~ c_pca_t$scores, set_c_t)
+summary(c_pcr_t)
+c_pca_dataframe_t = data.frame(unclass(c_pca_t$scores))
+c_pca_dataframe_t$TP53 = set_c_t$TP53
+c_pcr_cv_t = cv.lm(data = c_pca_dataframe_t, form.lm = TP53 ~ ., m = 10) # 1.09
+
+## PLS
+c_pls_t = plsr(TP53 ~ .,ncomp = 30,scale = TRUE, data = set_c_t, validation = "CV", method="oscorespls")
+summary(c_pls_t)
+drop(coef(c_pls_t))
+
+c_pls_lm_t = lm(TP53 ~ c_pls_t$scores,set_c_t)
+summary(c_pls_lm_t)
+
+c_pls_dataframe_t = data.frame(unclass(c_pls_t$scores))
+c_pls_dataframe_t$TP53 = set_c_t$TP53
+c_pls_cv_t = cv.lm(data = c_pls_dataframe_t, form.lm = TP53 ~ ., m = 10) #0.737
+
+## PLS decomposition
+loadings = as.matrix(c_pls_t$loadings)
+c_pls_beta = apply(X = loadings, MARGIN = 1, FUN = sum)
+names(c_pls_beta[c_pls_beta > 0.2])
+c_pls_cv_t_dec = cv.lm(data = set_c_t, form.lm = TP53 ~ EXOC7 + SMARCC1 + DVL3 + HDAC3 + RWDD2A + KIDINS220 + ZGPAT + SLC25A11 + MYH6 + RPS13 + MREG + GSTA3 + DNAJA3 + ALKBH4 + NRBP1 + AGGF1 + MAT1A + RANBP10 + BAT2, m = 10) 
+mean((c_pls_cv_t_dec$cvpred-c_pls_cv_t_dec$TP53)^2) # 0.949
+
+# cv becomes larger. I finally choose c_aic_stepwise_t.
+
+## LASSO
+c_lasso_cv_t = cv.glmnet(model.matrix(c_aic_stepwise_t)[,-1], set_c_t$TP53, lambda = grid)
+c_lasso_t = glmnet(model.matrix(c_aic_stepwise_t)[,-1], set_c_t$TP53, lambda = c_lasso_cv_t$lambda.min)
+summary(c_lasso_t)
+
+## Comparing CV
+mean((c_aic_forward_cv_t$cvpred-c_aic_forward_cv_t$TP53)^2)
+mean((c_aic_backward_cv_t$cvpred-c_aic_backward_cv_t$TP53)^2)
+mean((c_aic_stepwise_cv_t$cvpred-c_aic_stepwise_cv_t$TP53)^2) # best
+mean((c_bic_forward_cv_t$cvpred-c_bic_forward_cv_t$TP53)^2)
+mean((c_bic_backward_cv_t$cvpred-c_bic_backward_cv_t$TP53)^2)
+mean((c_bic_stepwise_cv_t$cvpred-c_bic_stepwise_cv_t$TP53)^2)
+mean((c_pcr_cv_t$cvpred-c_pcr_cv_t$TP53)^2)
+mean((c_pls_cv_t$cvpred-c_pls_cv_t$TP53)^2)
+c_lasso_cv_t$cvm[which(c_lasso_cv_t$lambda == c_lasso_cv_t$lambda.min)] # this is larger than the original model without CV
+c_lasso_fitted_value_t = model.matrix(c_aic_stepwise_t)[,-1] %*% c_lasso_t$beta
+plot(c_lasso_fitted_value_t, c_lasso_fitted_value_t - set_c_t$TP53, main = "Residuals vs Fitted (Set C, TP53, LASSO)", xlab = "Fitted values", ylab = "Residuals")
+
+save(c_bic_backward_t, file = "c_bic_backward_t.RData")
+
+```
+
+** Set combine, response **
+```{r}
+## transformation
+hist(set_combine_scale$response, main = "Histogram of response (Combination of Two Sets)", xlab = "response")
+hist(log(set_combine_scale$response), main = "Histogram of log(response) (Combination of Two Sets)", xlab = "log(response)")
+set_combine_log = mutate(y=log(response),.data = set_combine_scale)#new y
+set_combine_log = select(set_combine_log,-response)
+set_combine_log$y = scale(set_combine_log$y)
+save(set_combine_log,file = "../data/set_combine_log.RData")
+
+## fitting full model
+m_combine = lm(response~., data = set_combine_scale)
+layout(matrix(data = c(1,2,3,4), ncol = 2, byrow = TRUE))
+plot(m_combine)
+layout(1)
+m0_combine = lm(y ~ ., data = set_combine_log)
+layout(matrix(data = c(1,2,3,4), ncol = 2, byrow = TRUE))
+plot(m0_combine)
+layout(1)
+vif(m0_combine)
+max(vif(m0_combine))
+
+## model selection
+m1_combine = lm(y ~ 1, data = set_combine_log)
+n = dim(set_combine_log)[1]
+
+combine_aic_forward = step(object = m1_combine, scope = formula(m0_combine), direction="forward") # forward
+summary(combine_aic_forward)
+plot(combine_aic_forward, which = 4)
+outlierTest(combine_aic_forward)
+which(abs(rstudent(combine_aic_forward)) >= qt(0.05/2, dim(set_combine_log)[1] - dim(set_combine_log)[2] - 1, lower.tail = FALSE))
+
+combine_aic_backward = step(m0_combine, direction="backward") # backward
+summary(combine_aic_backward) 
+plot(combine_aic_backward, which = 4)
+outlierTest(combine_aic_backward)
+which(abs(rstudent(combine_aic_backward)) >= qt(0.05/2, dim(set_combine_log)[1] - dim(set_combine_log)[2] - 1, lower.tail = FALSE))
+
+combine_aic_stepwise = step(object = m1_combine, scope = formula(m0_combine), direction="both") #stepwise
+summary(combine_aic_stepwise)
+plot(combine_aic_stepwise, which = 4)
+outlierTest(combine_aic_stepwise)
+which(abs(rstudent(combine_aic_stepwise)) >= qt(0.05/2, dim(set_combine_log)[1] - dim(set_combine_log)[2] - 1, lower.tail = FALSE))
+
+
+
+combine_bic_forward = step(object = m1_combine, scope = formula(m0_combine), direction="forward", k = log(n)) # forward
+summary(combine_bic_forward)
+plot(combine_bic_forward, which = 4)
+outlierTest(combine_bic_forward)
+which(abs(rstudent(combine_bic_forward)) >= qt(0.05/2, dim(set_combine_log)[1] - dim(set_combine_log)[2] - 1, lower.tail = FALSE))
+
+combine_bic_backward = step(m0_combine, direction="backward", k = log(n)) # backward
+summary(combine_bic_backward)
+plot(combine_bic_backward, which = 4)
+outlierTest(combine_bic_backward)
+which(abs(rstudent(combine_bic_backward)) >= qt(0.05/2, dim(set_combine_log)[1] - dim(set_combine_log)[2] - 1, lower.tail = FALSE))
+
+combine_bic_stepwise = step(object = m1_combine, scope = formula(m0_combine), direction="both", k = log(n)) #stepwise
+summary(combine_bic_stepwise)
+plot(combine_bic_stepwise, which = 4)
+outlierTest(combine_bic_stepwise)
+which(abs(rstudent(combine_bic_stepwise)) >= qt(0.05/2, dim(set_combine_log)[1] - dim(set_combine_log)[2] - 1, lower.tail = FALSE))
+
+## Mallow's cp
+# combine_aic_forward_cp = leaps(model.matrix(combine_aic_forward)[,-1], set_combine_log$y, nbest=1) # too many variables
+
+# combine_aic_backward_cp = leaps(model.matrix(combine_aic_backward)[,-1], set_combine_log$y, nbest=1) # too many variables
+
+# combine_aic_stepwise_cp = leaps(model.matrix(combine_aic_stepwise)[,-1], set_combine_log$y, nbest=1) # too many  variables
+
+combine_bic_forward_cp = leaps(model.matrix(combine_bic_forward)[,-1], set_combine_log$y, nbest=1)
+Cpplot(combine_bic_forward_cp) # same
+
+combine_bic_backward_cp = leaps(model.matrix(combine_bic_backward)[,-1], set_combine_log$y, nbest=1)
+Cpplot(combine_bic_backward_cp) # same
+
+combine_bic_stepwise_cp = leaps(model.matrix(combine_bic_stepwise)[,-1], set_combine_log$y, nbest=1)
+Cpplot(combine_bic_stepwise_cp) # same
+
+## Cross Validation
+combine_aic_forward_cv = cv.lm(data = set_combine_log, form.lm = y ~ KIR3DX1 + BCL7C + AAK1 + NXT2 + NPAS3 + GALNT14 + 
+    AMBP + FNDC4 + OCLN + PCDHA9 + ALKBH4 + SEMA3B + C1orf69 + 
+    CYP2W1 + MRPL40 + GPC4 + SMC5 + C5orf5 + HOXC10 + SLC35C2 + 
+    HPGD + SFRS16 + CIDEA + FLG + HMP19 + EVL + C11orf10 + VDR + 
+    SPINK1 + PLCG1 + FADS2 + DYNC1LI1 + GTF3C4 + X41519 + YEATS2 + 
+    DLGAP2 + TP53 + SYNJ2 + BRWD2 + THAP10 + RPGRIP1 + DKFZP566E164 + 
+    FASTK + GSTK1 + MRPL24 + NEK11 + F2R + ZNF492 + DHRS12 + 
+    GUCY1B3 + USP18 + FBLN5 + MAGEB2 + RPLP2 + TRIM15 + PKMYT1 + 
+    GOLPH3L + PALM + PYY + C16orf57 + PHLDB1 + ALDH3A1 + MATK + 
+    NCK2 + ZNF35 + AURKB + FMO1 + GABPB2 + VPS28 + GPR64 + IL12RB1 + 
+    HIST1H2BL + HNRPA3 + ANP32E + PLXNB1 + MAGED1 + SOSTDC1 + 
+    GPR143 + RABL4 + MCM5 + CLCN3 + LITAF + NELL2 + H2AFY + GGA3 + 
+    DDO + ULBP1 + KLF10 + FAM49B + KREMEN2 + CST3 + RALB + NRBP1 + 
+    FAM128A + CEL + TNIP1 + C13orf18 + NPBWR2 + DUS4L + MREG + 
+    S100A4 + PEX13 + NUP85 + ATP7A + CKB + SIVA1 + SCML1 + TAF9B + 
+    SEPW1, m = 10) #0.81
+
+combine_aic_backward_cv = cv.lm(data = set_combine_log, form.lm = y ~ CEL + HABP2 + CADM3 + SPINK1 + FLG + TBKBP1 + 
+    PROM1 + GRAMD3 + RAD23B + ATXN1 + ERLIN2 + PRPSAP2 + COL4A4 + 
+    HMBOX1 + FMO1 + PABPC3 + GOLPH3L + EDG5 + ARTS.1 + AZI2 + 
+    AURKB + ASCL2 + NEK11 + RHOBTB1 + HMP19 + DDO + OR2F2 + DNAJB5 + 
+    ADAMTSL3 + HBXIP + SEMA3A + TAF4 + RPGRIP1 + CANT1 + PCDH7 + 
+    OCLN + MGLL + NPC2 + EVL + ZC3H13 + TTLL12 + KIAA1199 + HNRPA3 + 
+    APEH + SLC19A1 + GPC4 + HRH4 + CIDEA + ULBP1 + GUCY1B3 + 
+    ITGB2 + TTK + TSPAN2 + TOMM40 + PTPLA + ZNF492 + ENTPD4 + 
+    P18SRP + MATK + C16orf57 + ZBED2 + BCL7C + POLR1E + PRKCQ + 
+    KLF10 + TNFRSF17 + KREMEN2 + H2AFY + PSME2 + TAF9B + GSTK1 + 
+    AAK1 + HSPA14 + FAM128A + C11orf10 + DUS4L + SCARF1 + ATP7A + 
+    NOL1 + TGFBR3 + NAP1L4 + NPBWR2 + SFRS16 + BRWD2 + PGRMC2 + 
+    GGA3 + CKB + S100A4 + C6orf130 + HNRNPU + USP6 + DYNC1LI1 + 
+    CHIC2 + RABL4 + PVRL3 + FADS2 + F2R + FLAD1 + GTF3C4 + ECT2 + 
+    C1orf54 + NPAS3 + KBTBD10 + IDH2 + THAP10 + TP53 + ARF1 + 
+    KCNMB2 + TPBG + SMARCC1 + PCDHA9 + MED17 + SECISBP2 + NELL2 + 
+    LCN2 + CCDC41 + FANCC + HDAC3 + DNPEP + EVI5 + USP18 + RPUSD2 + 
+    IL12RB1 + GMEB2 + SEPW1 + PLEKHF2 + MREG + MED23 + ARSF + 
+    GSTA3 + ATF7IP + DNAJA2 + ZNF35 + RALB + MAGEB2 + SMC5 + 
+    FLJ20309 + GALNT14 + DCLRE1C + PTMS + RPS21 + C9orf167 + 
+    PKMYT1 + HIRIP3 + MT1E + PTPLB + ALDH3A1 + MRPL40 + ALKBH4 + 
+    NRBP1 + CYP2W1 + MAGED1 + CST3 + EXOSC9 + ASH2L + RBM16 + 
+    NCK2 + KIR3DX1 + ASPN + OGFOD1 + FASTK + DNAJC10 + PDGFC + 
+    CFP + BUB1 + VDR + HIST1H2BL + DKFZP566E164 + WDR46 + DLGAP2 + 
+    PHF10 + GJA3 + ANP32E + YEATS2 + tcag7.1314 + TRIM15 + HDAC4 + 
+    SLC35C2 + BAT2, m =10) #0.855
+
+combine_aic_stepwise_cv = cv.lm(data = set_combine_log, form.lm = y ~ KIR3DX1 + BCL7C + AAK1 + NXT2 + NPAS3 + GALNT14 + 
+    AMBP + FNDC4 + OCLN + PCDHA9 + ALKBH4 + SEMA3B + CYP2W1 + 
+    MRPL40 + GPC4 + SMC5 + C5orf5 + SLC35C2 + SFRS16 + CIDEA + 
+    FLG + HMP19 + EVL + C11orf10 + VDR + SPINK1 + PLCG1 + FADS2 + 
+    GTF3C4 + X41519 + YEATS2 + DLGAP2 + TP53 + BRWD2 + THAP10 + 
+    RPGRIP1 + DKFZP566E164 + FASTK + GSTK1 + MRPL24 + NEK11 + 
+    F2R + ZNF492 + GUCY1B3 + USP18 + TRIM15 + RPLP2 + PKMYT1 + 
+    MAGEB2 + AURKB + GPR64 + GABPB2 + VPS28 + CEL + C2 + PHLDB1 + 
+    ALDH3A1 + C16orf57 + ZNF35 + CST3 + FAM120C + ORM1 + ATP7A + 
+    TAF9B + PYY + FPGS + PLXNB1 + IL12RB1 + PHF10 + PALM + OR51E2 + 
+    NCK2 + HIST1H2BL + tcag7.1314 + LAPTM4B + DDO + GOLPH3L, m = 10) #0.783
+
+combine_bic_forward_cv = cv.lm(data = set_combine_log, form.lm = y ~ KIR3DX1 + BCL7C + AAK1 + NXT2 + NPAS3 + GALNT14, m = 10) # 0.937
+
+combine_bic_backward_cv = cv.lm(data = set_combine_log, form.lm =  y ~ AAK1 + GALNT14 + KIR3DX1, m = 10) # 0.968
+
+combine_bic_stepwise_cv = cv.lm(data = set_combine_log, form.lm = y ~ KIR3DX1 + BCL7C + AAK1 + NXT2 + NPAS3 + GALNT14, m = 10) # 0.937
+
+## PCR
+combine_princomp = princomp(set_combine_log[,-201])
+summary(combine_princomp)
+loadings(combine_princomp)
+plot(combine_princomp, main = "Princomp (Combination of Two Sets)")
+
+combine_pca = pcr(y ~ ., ncomp = 30,scale = TRUE, data = set_combine_log, validation = "CV")
+summary(combine_pca)
+combine_pcr = lm(y ~ combine_pca$scores, set_combine_log)
+summary(combine_pcr)
+combine_pca_dataframe = data.frame(unclass(combine_pca$scores))
+combine_pca_dataframe$y = set_combine_log$y
+combine_pcr_cv = cv.lm(data = combine_pca_dataframe, form.lm = y ~ ., m = 10) #1.12
+
+## PLS
+combine_pls = plsr(y ~ .,ncomp = 30,scale = TRUE, data = set_combine_log, validation = "CV", method="oscorespls")
+summary(combine_pls)
+drop(coef(combine_pls))
+
+combine_pls_lm = lm(y~combine_pls$scores,set_combine_log)
+summary(combine_pls_lm)
+
+combine_pls_dataframe = data.frame(unclass(combine_pls$scores))
+combine_pls_dataframe$y = set_combine_log$y
+combine_pls_cv = cv.lm(data = combine_pls_dataframe, form.lm = y ~ ., m = 10) #1.59
+
+## LASSO
+combine_lasso_cv = cv.glmnet(model.matrix(combine_aic_stepwise)[,-1], set_combine_log$y, lambda = grid)
+combine_lasso = glmnet(model.matrix(combine_aic_stepwise)[,-1], set_combine_log$y, lambda = combine_lasso_cv$lambda.min)
+summary(combine_lasso)
+
+## Comparing CV
+mean((combine_aic_forward_cv$cvpred-combine_aic_forward_cv$y)^2)
+mean((combine_aic_backward_cv$cvpred-combine_aic_backward_cv$y)^2)
+mean((combine_aic_stepwise_cv$cvpred-combine_aic_stepwise_cv$y)^2) # best
+mean((combine_bic_forward_cv$cvpred-combine_bic_forward_cv$y)^2)
+mean((combine_bic_backward_cv$cvpred-combine_bic_backward_cv$y)^2)
+mean((combine_bic_stepwise_cv$cvpred-combine_bic_stepwise_cv$y)^2)
+mean((combine_pcr_cv$cvpred-combine_pcr_cv$y)^2)
+mean((combine_pls_cv$cvpred-combine_pls_cv$y)^2)
+combine_lasso_cv$cvm[which(combine_lasso_cv$lambda == combine_lasso_cv$lambda.min)]# this is larger than the original model without CV
+combine_lasso_fitted_value = model.matrix(combine_aic_stepwise)[,-1] %*% combine_lasso$beta
+plot(combine_lasso_fitted_value, combine_lasso_fitted_value - set_combine_log$y, main = "Residuals vs Fitted (Combine, response, LASSO)", xlab = "Fitted values", ylab = "Residuals")
+
+save(combine_bic_forward, file = "combine_bic_forward.RData")
+```
+
+
+** Set combine, TP53 **
+```{r}
+set_combine_t = set_combine_scale[,-391]
+save(set_combine_t,file = "../data/set_combine_t.RData")
+grep(pattern = "response", x = names(set_combine_scale))
+grep(pattern = "TP53", x = names(set_combine_scale))
+
+
+## fitting full model
+m0_combine_t = lm(TP53 ~ ., data = set_combine_t)
+layout(matrix(data = c(1,2,3,4), ncol = 2, byrow = TRUE))
+plot(m0_combine_t)
+layout(1)
+vif(m0_combine_t) # multicollinearity
+max(vif(m0_combine_t))
+which(vif(m0_combine_t) > 10)
+
+## model selection
+m1_combine_t = lm(TP53 ~ 1, data = set_combine_t)
+n = dim(set_combine_t)[1]
+
+combine_aic_forward_t = step(object = m1_combine_t, scope = formula(m0_combine_t), direction="forward") # forward
+summary(combine_aic_forward_t) # 0.609
+plot(combine_aic_forward_t, which = 4)
+outlierTest(combine_aic_forward_t)
+which(abs(rstudent(combine_aic_forward_t)) >= qt(0.05/2, dim(set_combine_t)[1] - dim(set_combine_t)[2] - 1, lower.tail = FALSE))
+
+combine_aic_backward_t = step(m0_combine_t, direction="backward") # backward
+summary(combine_aic_backward_t) # 0.644
+plot(combine_aic_backward_t, which = 4)
+outlierTest(combine_aic_backward_t)
+which(abs(rstudent(combine_aic_backward_t)) >= qt(0.05/2, dim(set_combine_t)[1] - dim(set_combine_t)[2] - 1, lower.tail = FALSE))
+
+combine_aic_stepwise_t = step(object = m1_combine_t, scope = formula(m0_combine_t), direction="both") #stepwise
+summary(combine_aic_stepwise_t) # 0.608
+plot(combine_aic_stepwise_t, which = 4)
+outlierTest(combine_aic_stepwise_t)
+which(abs(rstudent(combine_aic_stepwise_t)) >= qt(0.05/2, dim(set_combine_t)[1] - dim(set_combine_t)[2] - 1, lower.tail = FALSE))
+
+combine_bic_forward_t = step(object = m1_combine_t, scope = formula(m0_combine_t), direction="forward", k = log(n)) # forward
+summary(combine_bic_forward_t) # 0.24
+plot(combine_bic_forward_t, which = 4)
+outlierTest(combine_bic_forward_t)
+which(abs(rstudent(combine_bic_forward_t)) >= qt(0.05/2, dim(set_combine_t)[1] - dim(set_combine_t)[2] - 1, lower.tail = FALSE))
+
+combine_bic_backward_t = step(m0_combine_t, direction="backward", k = log(n)) # backward
+summary(combine_bic_backward_t) # 0.319
+plot(combine_bic_backward_t, which = 4)
+outlierTest(combine_bic_backward_t)
+which(abs(rstudent(combine_bic_backward_t)) >= qt(0.05/2, dim(set_combine_t)[1] - dim(set_combine_t)[2] - 1, lower.tail = FALSE))
+
+combine_bic_stepwise_t = step(object = m1_combine_t, scope = formula(m0_combine_t), direction="both", k = log(n)) #stepwise
+summary(combine_bic_stepwise_t) # 0.124
+plot(combine_bic_stepwise_t, which = 4)
+outlierTest(combine_bic_stepwise_t)
+which(abs(rstudent(combine_bic_stepwise_t)) >= qt(0.05/2, dim(set_combine_t)[1] - dim(set_combine_t)[2] - 1, lower.tail = FALSE))
+
+## Mallow's cp
+#combine_aic_forward_cp_t = leaps(model.matrix(combine_aic_forward_t)[,-1], set_combine_t$TP53, nbest=1) # too many variables
+
+# combine_aic_backward_cp_t = leaps(model.matrix(combine_aic_backward_t)[,-1], set_combine_t$TP53, nbest=1) # too many variables
+
+# combine_aic_stepwise_cp_t = leaps(model.matrix(combine_aic_stepwise_t)[,-1], set_combine_t$TP53, nbest=1) # too many  variables
+
+combine_bic_forward_cp_t = leaps(model.matrix(combine_bic_forward_t)[,-1], set_combine_t$TP53, nbest=1)
+Cpplot(combine_bic_forward_cp) # same
+
+combine_bic_backward_cp_t = leaps(model.matrix(combine_bic_backward_t)[,-1], set_combine_t$TP53, nbest=1)
+Cpplot(combine_bic_backward_cp) # same
+
+combine_bic_stepwise_cp_t = leaps(model.matrix(combine_bic_stepwise_t)[,-1], set_combine_t$TP53, nbest=1)
+Cpplot(combine_bic_stepwise_cp) # same
+
+## Cross Validation
+combine_aic_forward_cv_t = cv.lm(data = set_combine_t, form.lm = TP53 ~ PFN1 + RRP12 + KIDINS220 + BUB1 + C6orf130 + 
+    HBXIP + GK + SCML1 + RABL5 + ASCL2 + MYO7B + AURKB + OXCT1 + 
+    OCLN + SLC19A1 + AMBP + CST3 + DNAJC10 + EVL + PYY + RANBP10 + 
+    TAF4 + C16orf57 + ARHGEF12 + RRP1 + KIAA1012 + FAM128A + 
+    LITAF + HOXA9 + NDUFB8 + SCLY + PHF10 + MATK + FPGS + DNAJB5 + 
+    TMEM38B + RPGRIP1 + MAT1A + RBM16 + NAP1L4 + THRB + CACNA2D2 + 
+    MYH6 + PPM1H + APITD1 + ZC3H13 + HNRNPU + KIAA1704 + PLCG1 + 
+    BAT2 + KLHDC3 + tcag7.1314 + SEMA3B + TARBP2 + PSCD1 + HELZ + 
+    TLK2 + SLC6A8 + RBM12B + KLF10 + KIAA0586 + CEPT1 + NADSYN1 + 
+    EXOC7 + TAF9B + TRIM27 + TBL2 + KIAA1199 + MRC2 + MAD2L1 + 
+    RFK + C5orf13 + CIR + KATNB1 + HOXC10 + PALM + DCLRE1C + 
+    GUCY1B3 + G0S2 + GSTK1 + MAL + KREMEN2 + MAGED1 + ENOSF1 + 
+    PEX13 + LMO3 + C20orf43 + CPSF1 + FBLN5 + MOSC1 + VTCN1 + 
+    RABL4 + TNRC6B + PTPLA + DYNC1LI1 + ARSF + ARF1 + NT5M + 
+    TBKBP1 + PITX1 + RAD23B + SIGLEC9 + CADM3 + SLC6A3 + EIF4E + 
+    RWDD2A + PTMS + PDCD1LG2 + SOCS6 + THAP10 + IL12RB1 + OR2F2 + 
+    TMEM47 + C9orf167 + HIST1H2BC + CCDC41 + USP6 + CKB + PLEKHF2 + 
+    SLC46A3 + NUP85 + TK1 + ALDH3A1 + X41519 + POLR3B + OR51E2 + 
+    IKBKB + GM2A + TNIP1 + GGA3 + TTLL5 + HIRIP3 + SLC7A8 + SCNN1B + 
+    SYNJ2 + KCNMB2 + SEMA3A + ADAMTSL3 + TNKS + DNAJA2 + MLF1 + 
+    NRBP1 + VPS28 + MAN2A2 + SIVA1 + SFRP1 + RPLP2, m = 10) # 0.55
+
+combine_aic_backward_cv_t = cv.lm(data = set_combine_t, form.lm = TP53 ~ HOXC10 + TRIM36 + CADM3 + PYY + SLC6A8 + 
+    TBKBP1 + PROM1 + TNRC6B + NADSYN1 + FCGR2C + MRC2 + GOLPH3L + 
+    SEMA3B + AURKB + DAPP1 + DDO + OR2F2 + DNAJB5 + ADAMTSL3 + 
+    HBXIP + ARHGEF12 + OR51E2 + AMBP + RPGRIP1 + OCLN + NPC2 + 
+    RRP1 + EVL + ZC3H13 + KIAA1199 + PHLDB1 + SLC19A1 + GPC4 + 
+    FPGS + GUCY1B3 + RABL5 + MATK + C16orf57 + PLVAP + ZBED2 + 
+    BCL7C + POLR1E + LITAF + KLF10 + PRAMEF10 + C5orf13 + TNKS + 
+    KREMEN2 + H2AFY + TMEM47 + RFK + PALM + NDUFB8 + KLHDC3 + 
+    GSTK1 + PTX3 + G0S2 + MYO7B + FAM128A + CLCN3 + SCARF1 + 
+    ATP7A + NOL1 + TGFBR3 + NPBWR2 + FAM49B + BRWD2 + PGRMC2 + 
+    PFN1 + GGA3 + LMO3 + CKB + S100A4 + HNRNPU + NCAN + USP6 + 
+    EIF4E + KIAA0586 + SCNN1B + DYNC1LI1 + CHIC2 + RABL4 + IKBKB + 
+    SFRS12 + TMEM38B + YARS + FADS2 + MAD2L1 + GM2A + KIAA1704 + 
+    ECT2 + C1orf54 + SLC24A3 + THRB + PMM2 + PDIA3 + HOXA9 + 
+    SYNJ2 + ELAVL2 + RBM12B + THAP10 + MMP1 + PRDM2 + SYNGR3 + 
+    ARF1 + CPSF1 + HIST1H2BC + KCNMB2 + SERPINE2 + TPBG + UBE1L2 + 
+    TBL2 + FBLN5 + YIPF3 + CEPT1 + SECISBP2 + TARBP2 + CIR + 
+    CCDC41 + PSCD1 + FANCC + HRK + IL12RB1 + VPS28 + NDUFA7 + 
+    PLCG1 + RWDD2A + KIDINS220 + SNX17 + APITD1 + MREG + ARSF + 
+    MOSC1 + GSTA3 + DNAJA2 + MCM5 + ZNF35 + SMC5 + PTMS + SNAPC2 + 
+    CHPF + HIRIP3 + RPLP2 + NUP85 + MRPL24 + SOCS6 + ALDH3A1 + 
+    OXCT1 + C20orf43 + GABPB2 + MRPL40 + PITX1 + POLR3B + PLCD1 + 
+    MAGED1 + SLC7A8 + IL2RG + ADRB3 + MAT1A + RBM16 + KIR3DX1 + 
+    PIGC + ASPN + KIAA1012 + KATNB1 + GK + HELZ + FASTK + ENOSF1 + 
+    TNIP1 + SCLY + FLJ20160 + BUB1 + HIST1H2BL + SLC1A6 + ZNF250 + 
+    PEX13 + DKFZP566E164 + WDR46 + TRIM27 + AKAP4 + PHF10 + GJA3 + 
+    H6PD + ANP32E + tcag7.1314 + TRIM15 + HDAC4 + SLC35C2 + MLF1 + 
+    VTCN1 + BAT2 + MAN2A2, m =10) #0.598
+
+combine_aic_stepwise_cv_t = cv.lm(data = set_combine_t, form.lm = TP53 ~ PFN1 + RRP12 + KIDINS220 + C6orf130 + HBXIP + 
+    GK + RABL5 + MYO7B + AURKB + OXCT1 + OCLN + SLC19A1 + AMBP + 
+    CST3 + EVL + PYY + RANBP10 + C16orf57 + ARHGEF12 + RRP1 + 
+    FAM128A + LITAF + HOXA9 + NDUFB8 + SCLY + PHF10 + MATK + 
+    FPGS + DNAJB5 + TMEM38B + RPGRIP1 + MAT1A + RBM16 + NAP1L4 + 
+    THRB + CACNA2D2 + MYH6 + APITD1 + ZC3H13 + HNRNPU + KIAA1704 + 
+    PLCG1 + BAT2 + KLHDC3 + tcag7.1314 + SEMA3B + TARBP2 + PSCD1 + 
+    HELZ + TLK2 + SLC6A8 + RBM12B + KLF10 + KIAA0586 + CEPT1 + 
+    NADSYN1 + RAD23B + TBL2 + TRIM27 + HOXC10 + CIR + MAD2L1 + 
+    KIAA1199 + MRC2 + TNRC6B + KCNMB2 + TK1 + C5orf13 + PALM + 
+    GUCY1B3 + DCLRE1C + RFK + RABL4 + SOCS6 + G0S2 + LMO3 + GM2A + 
+    SLC7A8 + TNIP1 + DYNC1LI1 + CPSF1 + APEH + PEX13 + RWDD2A + 
+    TBKBP1 + ENOSF1 + C1orf54 + SLC46A3 + ARSF + NUP85 + SCNN1B + 
+    RPLP2 + IKBKB + OR51E2 + OR2F2 + PTPLA + VTCN1 + DAPP1 + 
+    TPBG + IL12RB1 + TNKS + GJA3 + THAP10 + ELAVL2 + HIST1H2BL + 
+    PROM1 + PTMS + GGA3 + MOSC1 + SLC6A3 + HDAC4 + ARF1 + HIST1H2BC + 
+    CCDC41 + USP6 + POLR3B + RPUSD2 + MAN2A2 + SYNJ2 + PDCD1LG2 + 
+    RPP21 + SIGLEC9 + YARS + MRPL49 + TAF9B + KCNA5 + CKB + ULBP1 + 
+    TMEM47 + EDG5 + KREMEN2 + CHPF + NPC2, m = 10) #0.54
+
+combine_bic_forward_cv_t = cv.lm(data = set_combine_t, form.lm = TP53 ~ PFN1 + RRP12 + KIDINS220 + BUB1 + C6orf130 + 
+    HBXIP + GK + SCML1 + RABL5 + ASCL2 + MYO7B + AURKB + OXCT1 + 
+    OCLN, m = 10) # 0.781
+
+combine_bic_backward_cv_t = cv.lm(data = set_combine_t, form.lm = TP53 ~ SLC6A8 + AURKB + DNAJB5 + HBXIP + RPGRIP1 + 
+    KIAA1199 + FPGS + MATK + C16orf57 + LITAF + NDUFB8 + MYO7B + 
+    FAM128A + PFN1 + HNRNPU + TMEM38B + THRB + HOXA9 + RBM12B + 
+    KCNMB2 + PLCG1 + KIDINS220 + MOSC1 + GK + SCLY + PHF10, m = 10) # 0.721
+
+combine_bic_stepwise_cv_t = cv.lm(data = set_combine_t, form.lm = TP53 ~ PFN1 + RRP12 + KIDINS220 + BUB1 + HBXIP + 
+    GK + SCML1 + RABL5 + ASCL2 + MYO7B + AURKB + OXCT1 + HDAC3 + 
+    PLCG1 + FAM128A, m = 10) # 0.766
+
+## PCR
+grep(pattern = "TP53", x = names(set_combine_log))
+combine_princomp_t = princomp(set_combine_t[,-4])
+summary(combine_princomp_t)
+loadings(combine_princomp_t)
+plot(combine_princomp_t, main = "Princomp (Combination of Two Sets)")
+
+combine_pca_t = pcr(TP53 ~ ., ncomp = 30,scale = TRUE, data = set_combine_t, validation = "CV")
+summary(combine_pca_t)
+combine_pcr_t = lm(TP53 ~ combine_pca_t$scores, set_combine_t)
+summary(combine_pcr_t)
+combine_pca_dataframe_t = data.frame(unclass(combine_pca_t$scores))
+combine_pca_dataframe_t$TP53 = set_combine_t$TP53
+combine_pcr_cv_t = cv.lm(data = combine_pca_dataframe_t, form.lm = TP53 ~ ., m = 10) # 1.05
+
+## PLS
+combine_pls_t = plsr(TP53 ~ .,ncomp = 30,scale = TRUE, data = set_combine_t, validation = "CV", method="oscorespls")
+summary(combine_pls_t)
+drop(coef(combine_pls_t))
+
+combine_pls_lm_t = lm(TP53 ~ combine_pls_t$scores,set_combine_t)
+summary(combine_pls_lm_t)
+
+combine_pls_dataframe_t = data.frame(unclass(combine_pls_t$scores))
+combine_pls_dataframe_t$TP53 = set_combine_t$TP53
+combine_pls_cv_t = cv.lm(data = combine_pls_dataframe_t, form.lm = TP53 ~ ., m = 10) #1.25
+
+## LASSO
+combine_lasso_cv_t = cv.glmnet(model.matrix(combine_aic_forward_t)[,-1], set_combine_t$TP53, lambda = grid)
+combine_lasso_t = glmnet(model.matrix(combine_aic_stepwise_t)[,-1], set_combine_t$TP53, lambda = combine_lasso_cv_t$lambda.min)
+summary(combine_lasso_t)
+combine_lasso_fitted_value_t = model.matrix(combine_aic_forward_t)[,-1] %*% combine_lasso_t$beta
+plot(combine_lasso_fitted_value_t, combine_lasso_fitted_value_t - set_combine_t$TP53, main = "Residuals vs Fitted (Combine, TP53, LASSO)", xlab = "Fitted values", ylab = "Residuals")
+
+## Comparing CV
+mean((combine_aic_forward_cv_t$cvpred-combine_aic_forward_cv_t$TP53)^2)
+mean((combine_aic_backward_cv_t$cvpred-combine_aic_backward_cv_t$TP53)^2)
+mean((combine_aic_stepwise_cv_t$cvpred-combine_aic_stepwise_cv_t$TP53)^2) # best
+mean((combine_bic_forward_cv_t$cvpred-combine_bic_forward_cv_t$TP53)^2)
+mean((combine_bic_backward_cv_t$cvpred-combine_bic_backward_cv_t$TP53)^2)
+mean((combine_bic_stepwise_cv_t$cvpred-combine_bic_stepwise_cv_t$TP53)^2)
+mean((combine_pcr_cv_t$cvpred-combine_pcr_cv_t$TP53)^2)
+mean((combine_pls_cv_t$cvpred-combine_pls_cv_t$TP53)^2)
+combine_lasso_cv_t$cvm[which(combine_lasso_cv_t$lambda == combine_lasso_cv_t$lambda.min)]
+
+
+save(combine_bic_backward_t, file = "combine_bic_backward_t.RData")
+```
+
